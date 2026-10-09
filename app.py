@@ -510,7 +510,7 @@ if uploaded_files:
                         break
 
                 if date_col:
-                    dt_series = pd.to_datetime(df[date_col], dayfirst=True, errors='coerce')
+                    dt_series = pd.to_datetime(df[date_col], format='mixed', dayfirst=False, errors='coerce')
                     month_series = dt_series.dt.strftime('%B').str.upper()
                     df['Month'] = month_series.fillna(fallback_month_name)
                 else:
@@ -619,7 +619,7 @@ if uploaded_files:
                 break
 
         if date_col:
-            final_df['_date_dt'] = pd.to_datetime(final_df[date_col], dayfirst=True, errors='coerce')
+            final_df['_date_dt'] = pd.to_datetime(final_df[date_col], format='mixed', dayfirst=False, errors='coerce')
             def assign_week_formatted(row):
                 dt = row['_date_dt']
                 if pd.isna(dt): return np.nan
