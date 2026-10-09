@@ -160,7 +160,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.write("Upload up to 5 monthly Excel ad campaign spreadsheets (.xlsx, .xls, .xlsb, .xlsm). Preview raw & consolidated sheets, view chronological Month-on-Month Comparison tables with custom sub-tab month filters, and analyze multi-metric curve & bar trend comparisons.")
+st.write("Upload up to 5 monthly Excel ad campaign spreadsheets (.xlsx, .xls, .xlsb, .xlsm). Preview raw & consolidated sheets (omitting the first summary tab), view chronological Month-on-Month Comparison tables with custom sub-tab month filters, and analyze multi-metric curve & bar trend comparisons.")
 
 def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     buffer = io.BytesIO()
@@ -496,12 +496,15 @@ if uploaded_files:
         
         try:
             xls = pd.ExcelFile(uploaded_file)
-            for sheet_name in xls.sheet_names:
+            # Omit the first tab (e.g. MTD Claimables summary/claim sheet) and process from second tab onwards
+            valid_sheet_names = xls.sheet_names[1:] if len(xls.sheet_names) > 1 else xls.sheet_names
+            
+            for sheet_name in valid_sheet_names:
                 df = pd.read_excel(xls, sheet_name=sheet_name)
                 raw_files_dict[uploaded_file.name][sheet_name] = df.copy()
                 
                 date_col = None
-                for col_candidate in ['Date', 'date', 'Day', 'DATE']:
+                for col_candidate in ['Date', 'date', 'Day', 'DATE', 'date_ist', 'timestamp']:
                     if col_candidate in df.columns:
                         date_col = col_candidate
                         break
@@ -610,7 +613,7 @@ if uploaded_files:
             final_df['Ad Type Combined'] = "Other"
 
         date_col = None
-        for col_candidate in ['Date', 'date', 'Day', 'DATE']:
+        for col_candidate in ['Date', 'date', 'Day', 'DATE', 'date_ist', 'timestamp']:
             if col_candidate in final_df.columns:
                 date_col = col_candidate
                 break
@@ -935,7 +938,7 @@ if uploaded_files:
         ])
 
         with main_tab1:
-            st.caption("Inspect individual sheets tab-by-tab for each uploaded file.")
+            st.caption("Inspect individual sheets tab-by-tab for each uploaded file (omitting the first summary tab).")
             selected_file_name = st.selectbox("Select Uploaded File to Preview:", list(raw_files_dict.keys()))
             if selected_file_name:
                 sheets = raw_files_dict[selected_file_name]
@@ -944,7 +947,7 @@ if uploaded_files:
                     st.dataframe(format_dashboard_dataframe(sheets[selected_sheet].head(100)), use_container_width=True, hide_index=True)
 
         with main_tab2:
-            st.caption("Preview the combined dataset across all uploaded files.")
+            st.caption("Preview the combined dataset across all uploaded files (omitting the first summary tab).")
             preview_clean_df = final_df.drop(columns=['_impressions', '_direct_atc', '_indirect_atc', '_atc', '_direct_orders', '_indirect_orders', '_orders', '_direct_sales', '_indirect_sales', '_sales', '_budget_consumed', '_date_dt', 'Ad Type Combined'], errors='ignore')
             st.dataframe(format_dashboard_dataframe(preview_clean_df.head(100)), use_container_width=True, hide_index=True)
 
@@ -1142,7 +1145,7 @@ if uploaded_files:
                 })
                 st.dataframe(format_dashboard_dataframe(disp_summary), use_container_width=True, hide_index=True)
 
-                st.markdown("#### 📉 Curved Trend Line & Pillar CombinationGraph")
+                st.markdown("#### 📉 Curved Trend Line & Pillar Combination Graph")
                 
                 fig_trend = make_subplots(specs=[[{"secondary_y": True}]])
 
