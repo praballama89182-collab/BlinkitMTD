@@ -496,7 +496,6 @@ if uploaded_files:
         
         try:
             xls = pd.ExcelFile(uploaded_file)
-            # Omit the first tab (e.g. MTD Claimables summary/claim sheet) and process from second tab onwards
             valid_sheet_names = xls.sheet_names[1:] if len(xls.sheet_names) > 1 else xls.sheet_names
             
             for sheet_name in valid_sheet_names:
@@ -513,8 +512,10 @@ if uploaded_files:
                     dt_series = pd.to_datetime(df[date_col], format='mixed', dayfirst=False, errors='coerce')
                     month_series = dt_series.dt.strftime('%B').str.upper()
                     df['Month'] = month_series.fillna(fallback_month_name)
+                    df['_date_dt'] = dt_series
                 else:
                     df['Month'] = fallback_month_name
+                    df['_date_dt'] = pd.NaT
 
                 df_raw = df.copy()
                 if sheet_name not in consolidated_raw_tabs:
@@ -618,8 +619,7 @@ if uploaded_files:
                 date_col = col_candidate
                 break
 
-        if date_col:
-            final_df['_date_dt'] = pd.to_datetime(final_df[date_col], format='mixed', dayfirst=False, errors='coerce')
+        if date_col and '_date_dt' in final_df.columns:
             def assign_week_formatted(row):
                 dt = row['_date_dt']
                 if pd.isna(dt): return np.nan
@@ -753,6 +753,36 @@ if uploaded_files:
 
             if working_df.empty:
                 return pd.DataFrame()
+
+            # If exactly ONE month is selected, drill down into daily breakdown (Day 1 to 31)
+            if selected_months and len(selected_months) == 1 and '_date_dt' in working_df.columns and working_df['_date_dt'].notna().any():
+                single_month = selected_months[0]
+                month_sub_df = working_df[working_df['Month'] == single_month].copy()
+                month_sub_df['_day'] = month_sub_df['_date_dt'].dt.day
+                
+                daily_agg = month_sub_df.groupby('_day').agg(
+                    Impressions=('_impressions', 'sum'),
+                    ATC=('_atc', 'sum'),
+                    Orders=('_orders', 'sum'),
+                    Spends=('_budget_consumed', 'sum'),
+                    Sales=('_sales', 'sum')
+                ).reset_index()
+
+                daily_agg['CPM'] = daily_agg.apply(lambda r: round((r['Spends'] / r['Impressions']) * 1000) if r['Impressions'] > 0 else 0, axis=1)
+                daily_agg['ROAS'] = daily_agg.apply(lambda r: round(r['Sales'] / r['Spends'], 2) if r['Spends'] > 0 else 0.0, axis=1)
+                daily_agg['ACOS'] = daily_agg.apply(lambda r: round((r['Spends'] / r['Sales']) * 100, 2) if r['Sales'] > 0 else 0.0, axis=1)
+
+                daily_agg['Spends'] = daily_agg['Spends'].round(2)
+                daily_agg['Sales'] = daily_agg['Sales'].round(2)
+
+                daily_agg = daily_agg.sort_values('_day')
+                daily_agg['Month'] = daily_agg['_day'].map(lambda d: f"Day {int(d)}")
+                daily_agg = daily_agg.drop(columns=['_day'])
+
+                col_order = ['Month', 'Impressions', 'CPM', 'ATC', 'Orders', 'Spends', 'Sales', 'ROAS', 'ACOS']
+                daily_agg = daily_agg[col_order]
+                daily_agg['ACOS'] = daily_agg['ACOS'].apply(lambda v: f"{v:.2f}%" if isinstance(v, (int, float)) else str(v))
+                return daily_agg
 
             monthly_agg = working_df.groupby('Month').agg(
                 Impressions=('_impressions', 'sum'),
@@ -975,7 +1005,7 @@ if uploaded_files:
             ])
 
             with comp_sub_tab0:
-                st.markdown("#### Monthly Comparison Summary Table")
+                st.markdown("#### Monthly Comparison Summary Table (Select single month for daily drill-down)")
                 m_months = month_filter_widget("monthly")
                 monthly_summary_df = create_monthly_summary_table(final_df, selected_months=m_months)
                 if not monthly_summary_df.empty:
