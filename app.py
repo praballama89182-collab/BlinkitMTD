@@ -746,7 +746,7 @@ if uploaded_files:
             pivot_df.index.name = entity_col
             return pivot_df
 
-        def create_monthly_summary_table(df_input, selected_months=None):
+        def create_monthly_summary_table(df_input, selected_months=None, expand_month=None):
             working_df = df_input.dropna(subset=['Month']).copy()
             if selected_months:
                 working_df = working_df[working_df['Month'].isin(selected_months)]
@@ -754,13 +754,72 @@ if uploaded_files:
             if working_df.empty:
                 return pd.DataFrame()
 
-            # If exactly ONE month is selected, drill down into daily breakdown (Day 1 to 31)
-            if selected_months and len(selected_months) == 1 and '_date_dt' in working_df.columns and working_df['_date_dt'].notna().any():
-                single_month = selected_months[0]
-                month_sub_df = working_df[working_df['Month'] == single_month].copy()
-                month_sub_df['_day'] = month_sub_df['_date_dt'].dt.day
+            all_months = get_calendar_months_asc(working_df)
+            
+            # If an expand_month is requested and exists in data
+            if expand_month and expand_month in all_months and '_date_dt' in working_df.columns and working_df['_date_dt'].notna().any():
+                # Build standard monthly rows for all months except expand_month
+                rows_list = []
+                for m in all_months:
+                    if m == expand_month:
+                        # Expand this month into daily rows serially
+                        m_df = working_df[working_df['Month'] == m].copy()
+                        m_df['_day'] = m_df['_date_dt'].dt.day
+                        daily_agg = m_df.groupby('_day').agg(
+                            Impressions=('_impressions', 'sum'),
+                            ATC=('_atc', 'sum'),
+                            Orders=('_orders', 'sum'),
+                            Spends=('_budget_consumed', 'sum'),
+                            Sales=('_sales', 'sum')
+                        ).reset_index().sort_values('_day')
+
+                        for _, r in daily_agg.iterrows():
+                            imp = r['Impressions']
+                            atc = r['ATC']
+                            ords = r['Orders']
+                            spends = round(r['Spends'], 2)
+                            sales = round(r['Sales'], 2)
+                            cpm = round((spends / imp) * 1000) if imp > 0 else 0
+                            roas = round(sales / spends, 2) if spends > 0 else 0.0
+                            acos = round((spends / sales) * 100, 2) if sales > 0 else 0.0
+                            
+                            rows_list.append({
+                                'Month': f"{m} - Day {int(r['_day'])}",
+                                'Impressions': imp,
+                                'CPM': cpm,
+                                'ATC': atc,
+                                'Orders': ords,
+                                'Spends': spends,
+                                'Sales': sales,
+                                'ROAS': roas,
+                                'ACOS': f"{acos:.2f}%"
+                            })
+                    else:
+                        m_df = working_df[working_df['Month'] == m]
+                        imp = m_df['_impressions'].sum()
+                        atc = m_df['_atc'].sum()
+                        ords = m_df['_orders'].sum()
+                        spends = round(m_df['_budget_consumed'].sum(), 2)
+                        sales = round(m_df['_sales'].sum(), 2)
+                        cpm = round((spends / imp) * 1000) if imp > 0 else 0
+                        roas = round(sales / spends, 2) if spends > 0 else 0.0
+                        acos = round((spends / sales) * 100, 2) if sales > 0 else 0.0
+                        
+                        rows_list.append({
+                            'Month': m,
+                            'Impressions': imp,
+                            'CPM': cpm,
+                            'ATC': atc,
+                            'Orders': ords,
+                            'Spends': spends,
+                            'Sales': sales,
+                            'ROAS': roas,
+                            'ACOS': f"{acos:.2f}%"
+                        })
                 
-                daily_agg = month_sub_df.groupby('_day').agg(
+                monthly_agg = pd.DataFrame(rows_list)
+            else:
+                monthly_agg = working_df.groupby('Month').agg(
                     Impressions=('_impressions', 'sum'),
                     ATC=('_atc', 'sum'),
                     Orders=('_orders', 'sum'),
@@ -768,64 +827,63 @@ if uploaded_files:
                     Sales=('_sales', 'sum')
                 ).reset_index()
 
-                daily_agg['CPM'] = daily_agg.apply(lambda r: round((r['Spends'] / r['Impressions']) * 1000) if r['Impressions'] > 0 else 0, axis=1)
-                daily_agg['ROAS'] = daily_agg.apply(lambda r: round(r['Sales'] / r['Spends'], 2) if r['Spends'] > 0 else 0.0, axis=1)
-                daily_agg['ACOS'] = daily_agg.apply(lambda r: round((r['Spends'] / r['Sales']) * 100, 2) if r['Sales'] > 0 else 0.0, axis=1)
+                monthly_agg['CPM'] = monthly_agg.apply(lambda r: round((r['Spends'] / r['Impressions']) * 1000) if r['Impressions'] > 0 else 0, axis=1)
+                monthly_agg['ROAS'] = monthly_agg.apply(lambda r: round(r['Sales'] / r['Spends'], 2) if r['Spends'] > 0 else 0.0, axis=1)
+                monthly_agg['ACOS'] = monthly_agg.apply(lambda r: round((r['Spends'] / r['Sales']) * 100, 2) if r['Sales'] > 0 else 0.0, axis=1)
 
-                daily_agg['Spends'] = daily_agg['Spends'].round(2)
-                daily_agg['Sales'] = daily_agg['Sales'].round(2)
+                monthly_agg['Spends'] = monthly_agg['Spends'].round(2)
+                monthly_agg['Sales'] = monthly_agg['Sales'].round(2)
 
-                daily_agg = daily_agg.sort_values('_day')
-                daily_agg['Month'] = daily_agg['_day'].map(lambda d: f"Day {int(d)}")
-                daily_agg = daily_agg.drop(columns=['_day'])
+                month_order = {m: i for i, m in enumerate(all_months)}
+                monthly_agg['month_order'] = monthly_agg['Month'].map(
+                    lambda x: month_order.get(str(x).strip().upper(), 999)
+                )
+                monthly_agg = monthly_agg.sort_values('month_order').drop(columns=['month_order'])
 
                 col_order = ['Month', 'Impressions', 'CPM', 'ATC', 'Orders', 'Spends', 'Sales', 'ROAS', 'ACOS']
-                daily_agg = daily_agg[col_order]
-                daily_agg['ACOS'] = daily_agg['ACOS'].apply(lambda v: f"{v:.2f}%" if isinstance(v, (int, float)) else str(v))
-                return daily_agg
+                monthly_agg = monthly_agg[col_order]
+                monthly_agg['ACOS'] = monthly_agg['ACOS'].apply(lambda v: f"{v:.2f}%" if isinstance(v, (int, float)) else str(v))
 
-            monthly_agg = working_df.groupby('Month').agg(
-                Impressions=('_impressions', 'sum'),
-                ATC=('_atc', 'sum'),
-                Orders=('_orders', 'sum'),
-                Spends=('_budget_consumed', 'sum'),
-                Sales=('_sales', 'sum')
-            ).reset_index()
-
-            monthly_agg['CPM'] = monthly_agg.apply(lambda r: round((r['Spends'] / r['Impressions']) * 1000) if r['Impressions'] > 0 else 0, axis=1)
-            monthly_agg['ROAS'] = monthly_agg.apply(lambda r: round(r['Sales'] / r['Spends'], 2) if r['Spends'] > 0 else 0.0, axis=1)
-            monthly_agg['ACOS'] = monthly_agg.apply(lambda r: round((r['Spends'] / r['Sales']) * 100, 2) if r['Sales'] > 0 else 0.0, axis=1)
-
-            monthly_agg['Spends'] = monthly_agg['Spends'].round(2)
-            monthly_agg['Sales'] = monthly_agg['Sales'].round(2)
-
-            all_months = get_calendar_months_asc(working_df)
-            month_order = {m: i for i, m in enumerate(all_months)}
-            monthly_agg['month_order'] = monthly_agg['Month'].map(
-                lambda x: month_order.get(str(x).strip().upper(), 999)
-            )
-            monthly_agg = monthly_agg.sort_values('month_order').drop(columns=['month_order'])
-
-            col_order = ['Month', 'Impressions', 'CPM', 'ATC', 'Orders', 'Spends', 'Sales', 'ROAS', 'ACOS']
-            monthly_agg = monthly_agg[col_order]
-
-            if len(monthly_agg) >= 2:
-                prev_row = monthly_agg.iloc[-2]
-                curr_row = monthly_agg.iloc[-1]
+            if len(all_months) >= 2 and not expand_month:
+                # Calculate MoM percentage change between last two chronological months
+                prev_m = all_months[-2]
+                curr_m = all_months[-1]
+                prev_df = working_df[working_df['Month'] == prev_m]
+                curr_df = working_df[working_df['Month'] == curr_m]
+                
+                prev_metrics = {
+                    'Impressions': prev_df['_impressions'].sum(),
+                    'CPM': round((prev_df['_budget_consumed'].sum() / prev_df['_impressions'].sum()) * 1000) if prev_df['_impressions'].sum() > 0 else 0,
+                    'ATC': prev_df['_atc'].sum(),
+                    'Orders': prev_df['_orders'].sum(),
+                    'Spends': prev_df['_budget_consumed'].sum(),
+                    'Sales': prev_df['_sales'].sum(),
+                    'ROAS': round(prev_df['_sales'].sum() / prev_df['_budget_consumed'].sum(), 2) if prev_df['_budget_consumed'].sum() > 0 else 0,
+                    'ACOS': round((prev_df['_budget_consumed'].sum() / prev_df['_sales'].sum()) * 100, 2) if prev_df['_sales'].sum() > 0 else 0
+                }
+                curr_metrics = {
+                    'Impressions': curr_df['_impressions'].sum(),
+                    'CPM': round((curr_df['_budget_consumed'].sum() / curr_df['_impressions'].sum()) * 1000) if curr_df['_impressions'].sum() > 0 else 0,
+                    'ATC': curr_df['_atc'].sum(),
+                    'Orders': curr_df['_orders'].sum(),
+                    'Spends': curr_df['_budget_consumed'].sum(),
+                    'Sales': curr_df['_sales'].sum(),
+                    'ROAS': round(curr_df['_sales'].sum() / curr_df['_budget_consumed'].sum(), 2) if curr_df['_budget_consumed'].sum() > 0 else 0,
+                    'ACOS': round((curr_df['_budget_consumed'].sum() / curr_df['_sales'].sum()) * 100, 2) if curr_df['_sales'].sum() > 0 else 0
+                }
 
                 pct_row = {'Month': 'Percentage %'}
                 for metric in ['Impressions', 'CPM', 'ATC', 'Orders', 'Spends', 'Sales', 'ROAS', 'ACOS']:
-                    prev_val = prev_row[metric]
-                    curr_val = curr_row[metric]
-                    if prev_val > 0:
-                        pct_change = round(((curr_val - prev_val) / prev_val) * 100)
+                    p_val = prev_metrics[metric]
+                    c_val = curr_metrics[metric]
+                    if p_val > 0:
+                        pct_change = round(((c_val - p_val) / p_val) * 100)
                         pct_row[metric] = f"{pct_change}%" if pct_change <= 0 else f"+{pct_change}%"
                     else:
                         pct_row[metric] = "0%"
 
                 monthly_agg = pd.concat([monthly_agg, pd.DataFrame([pct_row])], ignore_index=True)
 
-            monthly_agg['ACOS'] = monthly_agg['ACOS'].apply(lambda v: f"{v:.2f}%" if isinstance(v, (int, float)) else str(v))
             return monthly_agg
 
         def _format_dashboard_value(value, column_name=""):
@@ -911,11 +969,6 @@ if uploaded_files:
                     help="Click edge to expand full keyword string",
                     width="large"
                 )
-
-            if hasattr(unified_df.style, "map"):
-                styled_unified_df = unified_df.style.map(highlight_percentage_cells)
-            else:
-                styled_unified_df = unified_df.style.applymap(highlight_percentage_cells)
 
             display_df = format_dashboard_dataframe(unified_df)
             st.dataframe(
@@ -1005,9 +1058,13 @@ if uploaded_files:
             ])
 
             with comp_sub_tab0:
-                st.markdown("#### Monthly Comparison Summary Table (Select single month for daily drill-down)")
+                st.markdown("#### Monthly Comparison Summary Table")
                 m_months = month_filter_widget("monthly")
-                monthly_summary_df = create_monthly_summary_table(final_df, selected_months=m_months)
+                
+                expand_choice = st.selectbox("Expand specific month into daily breakdown (Optional):", ["None (Standard Monthly View)"] + all_cal_months, key="expand_month_sel")
+                target_expand_month = expand_choice if expand_choice != "None (Standard Monthly View)" else None
+
+                monthly_summary_df = create_monthly_summary_table(final_df, selected_months=m_months, expand_month=target_expand_month)
                 if not monthly_summary_df.empty:
                     render_unified_single_table(monthly_summary_df, key_prefix="monthly_summary_tab")
 
