@@ -160,7 +160,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.write("Upload up to 5 monthly Excel ad campaign spreadsheets (.xlsx, .xls, .xlsb, .xlsm). Preview raw & consolidated sheets (omitting the first summary tab), view chronological Month-on-Month Comparison tables with custom sub-tab month filters, and analyze multi-metric curve & bar trend comparisons.")
+st.write("Upload up to 5 monthly Excel ad campaign spreadsheets (.xlsx, .xls, .xlsb, .xlsm). Preview raw & consolidated sheets (omitting the first summary tab), view chronological Month-on-Month Comparison tables sorted by highest spends, and analyze multi-metric trends.")
 
 def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     buffer = io.BytesIO()
@@ -667,8 +667,11 @@ if uploaded_files:
             elif group_col == 'Ad Type Combined': display_name = 'MATCH / AD TYPE'
 
             grouped = grouped.rename(columns={group_col: display_name})
-            col_order = [display_name, 'IMPRESSIONS', 'CPM', 'ATC', 'ORDERS', 'SPENDS', 'SALES', 'ROAS', 'ACOS']
             
+            # SORTING BY HIGHEST SPENDS ON TOP
+            grouped = grouped.sort_values(by='SPENDS', ascending=False).reset_index(drop=True)
+
+            col_order = [display_name, 'IMPRESSIONS', 'CPM', 'ATC', 'ORDERS', 'SPENDS', 'SALES', 'ROAS', 'ACOS']
             res_df = grouped.reindex(columns=col_order)
             res_df['SPENDS'] = res_df['SPENDS'].round(2)
             res_df['SALES'] = res_df['SALES'].round(2)
@@ -720,6 +723,12 @@ if uploaded_files:
             sorted_cols = pd.MultiIndex.from_product([all_months, metrics_order], names=['Month', 'Metric'])
             pivot_df = pivot_df.reindex(columns=sorted_cols).fillna(0)
 
+            # SORT ENTITIES BY TOTAL SPENDS (Sum across all months for this entity) DESCENDING
+            # Exclude Grand Total from sorting
+            total_spends_per_entity = grouped.groupby(entity_col)['Spends'].sum()
+            sorted_entities = total_spends_per_entity.sort_values(ascending=False).index
+            pivot_df = pivot_df.reindex(sorted_entities)
+
             grand_total_series = {}
             for month in all_months:
                 month_df = working_df[working_df['Month'] == month]
@@ -756,13 +765,10 @@ if uploaded_files:
 
             all_months = get_calendar_months_asc(working_df)
             
-            # If an expand_month is requested and exists in data
             if expand_month and expand_month in all_months and '_date_dt' in working_df.columns and working_df['_date_dt'].notna().any():
-                # Build standard monthly rows for all months except expand_month
                 rows_list = []
                 for m in all_months:
                     if m == expand_month:
-                        # Expand this month into daily rows serially
                         m_df = working_df[working_df['Month'] == m].copy()
                         m_df['_day'] = m_df['_date_dt'].dt.day
                         daily_agg = m_df.groupby('_day').agg(
@@ -771,7 +777,7 @@ if uploaded_files:
                             Orders=('_orders', 'sum'),
                             Spends=('_budget_consumed', 'sum'),
                             Sales=('_sales', 'sum')
-                        ).reset_index().sort_values('_day')
+                        ).reset_index().sort_values(by='Spends', ascending=False) # Highest spends on top
 
                         for _, r in daily_agg.iterrows():
                             imp = r['Impressions']
@@ -845,7 +851,6 @@ if uploaded_files:
                 monthly_agg['ACOS'] = monthly_agg['ACOS'].apply(lambda v: f"{v:.2f}%" if isinstance(v, (int, float)) else str(v))
 
             if len(all_months) >= 2 and not expand_month:
-                # Calculate MoM percentage change between last two chronological months
                 prev_m = all_months[-2]
                 curr_m = all_months[-1]
                 prev_df = working_df[working_df['Month'] == prev_m]
@@ -1036,7 +1041,7 @@ if uploaded_files:
 
         with main_tab3:
             st.subheader("📊 Month-on-Month Comparison Tables")
-            st.caption("View chronological monthly summary & side-by-side MoM metrics for Campaign, Ad Type, Keywords, and Weeks with custom sub-tab month filters.")
+            st.caption("View chronological monthly summary & side-by-side MoM metrics sorted by highest spends.")
 
             all_cal_months = get_calendar_months_asc(final_df)
 
@@ -1078,9 +1083,25 @@ if uploaded_files:
                     )
 
             with comp_sub_tab1:
-                st.markdown("#### Campaign Month-on-Month Comparison Table")
+                st.markdown("#### Campaign Comparison (Click to expand keywords sorted by highest spends)")
                 c_months = month_filter_widget("campaign")
-                camp_pivot = create_mom_comparison_table(final_df, 'Campaign Name', selected_months=c_months) if 'Campaign Name' in final_df.columns else None
+                
+                # Campaign expansion feature
+                expand_camp_opt = st.selectbox("Expand Specific Campaign into Keywords Breakdown:", ["None (Standard Campaign View)"] + sorted([str(x) for x in final_df['Campaign Name'].dropna().unique()]), key="expand_camp_sel")
+                
+                kw_col = None
+                for c in ['Search Term', 'Keyword', 'Targeting Value']:
+                    if c in final_df.columns:
+                        kw_col = c
+                        break
+
+                if expand_camp_opt != "None (Standard Campaign View)" and kw_col:
+                    st.info(f"Showing keyword breakdown for campaign: **{expand_camp_opt}** (Sorted by Highest Spends)")
+                    sub_df = final_df[final_df['Campaign Name'] == expand_camp_opt]
+                    camp_pivot = create_mom_comparison_table(sub_df, kw_col, selected_months=c_months)
+                else:
+                    camp_pivot = create_mom_comparison_table(final_df, 'Campaign Name', selected_months=c_months) if 'Campaign Name' in final_df.columns else None
+
                 if camp_pivot is not None and not camp_pivot.empty:
                     render_unified_single_table(camp_pivot, key_prefix="camp_pivot_tab")
                     
@@ -1096,7 +1117,7 @@ if uploaded_files:
                     st.info("No Campaign Name column found or no data for selected months.")
 
             with comp_sub_tab2:
-                st.markdown("#### Ad Type Month-on-Month Comparison Table")
+                st.markdown("#### Ad Type Month-on-Month Comparison Table (Sorted by Highest Spends)")
                 a_months = month_filter_widget("adtype")
                 ad_pivot = create_mom_comparison_table(final_df, 'Ad Type Combined', selected_months=a_months) if 'Ad Type Combined' in final_df.columns else None
                 if ad_pivot is not None and not ad_pivot.empty:
@@ -1112,7 +1133,7 @@ if uploaded_files:
                     )
 
             with comp_sub_tab3:
-                st.markdown("#### Keyword / Search Term Month-on-Month Comparison Table")
+                st.markdown("#### Keyword / Search Term Month-on-Month Comparison Table (Sorted by Highest Spends)")
                 k_months = month_filter_widget("keyword")
                 kw_col = None
                 for c in ['Search Term', 'Keyword', 'Targeting Value']:
@@ -1135,7 +1156,7 @@ if uploaded_files:
                     st.info("No Keyword or Search Term column found.")
 
             with comp_sub_tab4:
-                st.markdown("#### Weekly Month-on-Month Comparison Table")
+                st.markdown("#### Weekly Month-on-Month Comparison Table (Sorted by Highest Spends)")
                 w_months = month_filter_widget("weekly")
                 week_pivot = create_mom_comparison_table(final_df, 'Week', selected_months=w_months) if ('Week' in final_df.columns and final_df['Week'].notna().any()) else None
                 if week_pivot is not None and not week_pivot.empty:
@@ -1304,6 +1325,7 @@ if uploaded_files:
 
         with main_tab5:
             if 'Campaign Name' in filtered_df.columns:
+                st.markdown("#### 🎯 Campaign Performance (Sorted by Highest Spends)")
                 campaign_options = ["All"] + sorted([str(x) for x in filtered_df['Campaign Name'].dropna().unique()])
                 selected_campaign = st.selectbox("Select Campaign:", campaign_options, key="camp_single_filt")
                 campaign_df = compute_grouped_table(filtered_df, 'Campaign Name', selected_campaign)
@@ -1312,6 +1334,7 @@ if uploaded_files:
 
         with main_tab6:
             if 'Ad Type Combined' in filtered_df.columns:
+                st.markdown("#### 📢 Ad Type Performance (Sorted by Highest Spends)")
                 adtype_options = ["All"] + sorted([str(x) for x in filtered_df['Ad Type Combined'].dropna().unique()])
                 selected_adtype = st.selectbox("Select Ad Type:", adtype_options, key="ad_single_filt")
                 adtype_df = compute_grouped_table(filtered_df, 'Ad Type Combined', selected_adtype)
@@ -1325,7 +1348,7 @@ if uploaded_files:
                     kw_col = c
                     break
             if kw_col:
-                st.markdown("#### 🔎 Keyword Performance & Search Filter")
+                st.markdown("#### 🔎 Keyword Performance & Search Filter (Sorted by Highest Spends)")
                 search_box_val = st.text_input("🔍 Search by Keyword or Initials (e.g. crack):", "", key="keyword_text_search")
                 
                 kw_options = ["All"] + sorted([str(x) for x in filtered_df[kw_col].dropna().unique()])
@@ -1351,6 +1374,7 @@ if uploaded_files:
 
         with main_tab8:
             if 'Week' in filtered_df.columns and filtered_df['Week'].notna().any():
+                st.markdown("#### 📅 Weekly Trend Performance (Sorted by Highest Spends)")
                 weekly_df = compute_grouped_table(filtered_df, 'Week', "All")
                 st.dataframe(format_dashboard_dataframe(weekly_df), use_container_width=True, hide_index=True)
 
