@@ -160,7 +160,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.write("Upload up to 5 monthly Excel ad campaign spreadsheets (.xlsx, .xls, .xlsb, .xlsm). Preview raw & consolidated sheets, view Month-on-Month Comparison tables sorted by highest spends with reverse-chronological month columns, and analyze multi-metric trends.")
+st.write("Upload up to 5 monthly Excel ad campaign spreadsheets (.xlsx, .xls, .xlsb, .xlsm). Preview raw & consolidated sheets, view Month-on-Month Comparison tables sorted by highest spends with precise decimal precision, and analyze multi-metric trends.")
 
 def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     buffer = io.BytesIO()
@@ -251,11 +251,11 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                         val_cell.value = val / 100.0 if val > 1 else val
                         val_cell.number_format = '0.00%'
                     elif str(m_col).upper() == 'CPM':
-                        val_cell.value = round(val)
-                        val_cell.number_format = '#,##0'
+                        val_cell.value = round(val, 2)
+                        val_cell.number_format = '#,##0.00'
                     else:
                         val_cell.value = round(val, 2)
-                        val_cell.number_format = '#,##0' if float(val).is_integer() else '#,##0.00'
+                        val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
                 else:
                     val_cell.value = val
     else:
@@ -279,11 +279,11 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                     val_cell.value = val / 100.0 if val > 1 else val
                     val_cell.number_format = '0.00%'
                 elif str(col_name).upper() == 'CPM' and not is_pct_row and isinstance(val, (int, float, np.number)):
-                    val_cell.value = round(val)
-                    val_cell.number_format = '#,##0'
+                    val_cell.value = round(val, 2)
+                    val_cell.number_format = '#,##0.00'
                 elif isinstance(val, float):
                     val_cell.value = round(val, 2)
-                    val_cell.number_format = '#,##0' if float(val).is_integer() else '#,##0.00'
+                    val_cell.number_format = '#,##0.00'
                 elif isinstance(val, (int, np.integer)):
                     val_cell.value = val
                     val_cell.number_format = '#,##0'
@@ -400,11 +400,11 @@ def convert_all_pivots_to_excel(pivot_dict):
                                 val_cell.value = val / 100.0 if val > 1 else val
                                 val_cell.number_format = '0.00%'
                             elif str(m_col).upper() == 'CPM':
-                                val_cell.value = round(val)
-                                val_cell.number_format = '#,##0'
+                                val_cell.value = round(val, 2)
+                                val_cell.number_format = '#,##0.00'
                             else:
                                 val_cell.value = round(val, 2)
-                                val_cell.number_format = '#,##0' if float(val).is_integer() else '#,##0.00'
+                                val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
                         else:
                             val_cell.value = val
             else:
@@ -427,8 +427,8 @@ def convert_all_pivots_to_excel(pivot_dict):
                             val_cell.value = val / 100.0 if val > 1 else val
                             val_cell.number_format = '0.00%'
                         elif str(col_name).upper() == 'CPM' and not is_pct_row and isinstance(val, (int, float, np.number)):
-                            val_cell.value = round(val)
-                            val_cell.number_format = '#,##0'
+                            val_cell.value = round(val, 2)
+                            val_cell.number_format = '#,##0.00'
                         elif isinstance(val, float):
                             val_cell.value = round(val, 2)
                             val_cell.number_format = '#,##0.00'
@@ -658,7 +658,7 @@ if uploaded_files:
                 SALES=('_sales', 'sum')
             ).reset_index()
 
-            grouped['CPM'] = grouped.apply(lambda r: round((r['SPENDS'] / r['IMPRESSIONS']) * 1000) if r['IMPRESSIONS'] > 0 else 0, axis=1)
+            grouped['CPM'] = grouped.apply(lambda r: round((r['SPENDS'] / r['IMPRESSIONS']) * 1000, 2) if r['IMPRESSIONS'] > 0 else 0.0, axis=1)
             grouped['ROAS'] = grouped.apply(lambda r: round(r['SALES'] / r['SPENDS'], 2) if r['SPENDS'] > 0 else 0.0, axis=1)
             grouped['ACOS'] = grouped.apply(lambda r: round((r['SPENDS'] / r['SALES']) * 100, 2) if r['SALES'] > 0 else 0.0, axis=1)
 
@@ -668,7 +668,7 @@ if uploaded_files:
 
             grouped = grouped.rename(columns={group_col: display_name})
             
-            # Sorted by highest spends on top
+            # Sort by raw unrounded SPENDS descending
             grouped = grouped.sort_values(by='SPENDS', ascending=False).reset_index(drop=True)
 
             col_order = [display_name, 'IMPRESSIONS', 'CPM', 'ATC', 'ORDERS', 'SPENDS', 'SALES', 'ROAS', 'ACOS']
@@ -706,7 +706,7 @@ if uploaded_files:
                 Sales=('_sales', 'sum')
             ).reset_index()
 
-            grouped['CPM'] = grouped.apply(lambda r: round((r['Spends'] / r['Impressions']) * 1000) if r['Impressions'] > 0 else 0, axis=1)
+            grouped['CPM'] = grouped.apply(lambda r: round((r['Spends'] / r['Impressions']) * 1000, 2) if r['Impressions'] > 0 else 0.0, axis=1)
             grouped['ROAS'] = grouped.apply(lambda r: round(r['Sales'] / r['Spends'], 2) if r['Spends'] > 0 else 0.0, axis=1)
             grouped['ACOS'] = grouped.apply(lambda r: round((r['Spends'] / r['Sales']) * 100, 2) if r['Sales'] > 0 else 0.0, axis=1)
 
@@ -718,28 +718,36 @@ if uploaded_files:
 
             metrics_order = ['Impressions', 'CPM', 'ATC', 'Orders', 'Spends', 'Sales', 'ROAS', 'ACOS']
             
-            # REVERSE CHRONOLOGICAL MONTH SORTING (Last month first, then earlier month, e.g. DEC then NOV)
-            all_months_asc = get_calendar_months_asc(working_df)
-            all_months_desc = sorted(all_months_asc, key=lambda x: MONTH_ORDER_ASC.get(x, 99), reverse=True)
+            # Check if this is Weekly comparison -> keep serial order Week 1, 2, 3, 4, 5
+            is_weekly = (entity_col == 'Week')
+            all_months_asc = get_calendar_months_asc(working_df) if not is_weekly else sorted(working_df['Month'].dropna().unique())
+            
+            if is_weekly:
+                # Serial week order
+                all_months_sorted = sorted(working_df['Month'].dropna().unique(), key=lambda w: int(''.join(filter(str.isdigit, str(w))) or 99))
+            else:
+                # Reverse chronological for other comparisons (Dec, Nov, Oct...)
+                all_months_sorted = sorted(all_months_asc, key=lambda x: MONTH_ORDER_ASC.get(str(x).strip().upper(), 99), reverse=True)
             
             pivot_df = pivot_df.reorder_levels([1, 0], axis=1)
-            sorted_cols = pd.MultiIndex.from_product([all_months_desc, metrics_order], names=['Month', 'Metric'])
+            sorted_cols = pd.MultiIndex.from_product([all_months_sorted, metrics_order], names=['Month', 'Metric'])
             pivot_df = pivot_df.reindex(columns=sorted_cols).fillna(0)
 
+            # Sort entities by total raw unrounded Spends across all months descending (excluding Grand Total)
             total_spends_per_entity = grouped.groupby(entity_col)['Spends'].sum()
             sorted_entities = total_spends_per_entity.sort_values(ascending=False).index
             pivot_df = pivot_df.reindex(sorted_entities)
 
             grand_total_series = {}
-            for month in all_months_desc:
+            for month in all_months_sorted:
                 month_df = working_df[working_df['Month'] == month]
                 total_imp = month_df['_impressions'].sum()
                 total_atc = month_df['_atc'].sum()
                 total_orders = month_df['_orders'].sum()
-                total_spends = round(month_df['_budget_consumed'].sum(), 2)
-                total_sales = round(month_df['_sales'].sum(), 2)
+                total_spends = month_df['_budget_consumed'].sum()
+                total_sales = month_df['_sales'].sum()
 
-                total_cpm = round((total_spends / total_imp) * 1000) if total_imp > 0 else 0
+                total_cpm = round((total_spends / total_imp) * 1000, 2) if total_imp > 0 else 0.0
                 total_roas = round(total_sales / total_spends, 2) if total_spends > 0 else 0.0
                 total_acos = round((total_spends / total_sales) * 100, 2) if total_sales > 0 else 0.0
 
@@ -747,8 +755,8 @@ if uploaded_files:
                 grand_total_series[(month, 'CPM')] = total_cpm
                 grand_total_series[(month, 'ATC')] = total_atc
                 grand_total_series[(month, 'Orders')] = total_orders
-                grand_total_series[(month, 'Spends')] = total_spends
-                grand_total_series[(month, 'Sales')] = total_sales
+                grand_total_series[(month, 'Spends')] = round(total_spends, 2)
+                grand_total_series[(month, 'Sales')] = round(total_sales, 2)
                 grand_total_series[(month, 'ROAS')] = total_roas
                 grand_total_series[(month, 'ACOS')] = total_acos
 
@@ -786,7 +794,7 @@ if uploaded_files:
                             ords = r['Orders']
                             spends = round(r['Spends'], 2)
                             sales = round(r['Sales'], 2)
-                            cpm = round((spends / imp) * 1000) if imp > 0 else 0
+                            cpm = round((spends / imp) * 1000, 2) if imp > 0 else 0.0
                             roas = round(sales / spends, 2) if spends > 0 else 0.0
                             acos = round((spends / sales) * 100, 2) if sales > 0 else 0.0
                             
@@ -808,7 +816,7 @@ if uploaded_files:
                         ords = m_df['_orders'].sum()
                         spends = round(m_df['_budget_consumed'].sum(), 2)
                         sales = round(m_df['_sales'].sum(), 2)
-                        cpm = round((spends / imp) * 1000) if imp > 0 else 0
+                        cpm = round((spends / imp) * 1000, 2) if imp > 0 else 0.0
                         roas = round(sales / spends, 2) if spends > 0 else 0.0
                         acos = round((spends / sales) * 100, 2) if sales > 0 else 0.0
                         
@@ -834,7 +842,7 @@ if uploaded_files:
                     Sales=('_sales', 'sum')
                 ).reset_index()
 
-                monthly_agg['CPM'] = monthly_agg.apply(lambda r: round((r['Spends'] / r['Impressions']) * 1000) if r['Impressions'] > 0 else 0, axis=1)
+                monthly_agg['CPM'] = monthly_agg.apply(lambda r: round((r['Spends'] / r['Impressions']) * 1000, 2) if r['Impressions'] > 0 else 0.0, axis=1)
                 monthly_agg['ROAS'] = monthly_agg.apply(lambda r: round(r['Sales'] / r['Spends'], 2) if r['Spends'] > 0 else 0.0, axis=1)
                 monthly_agg['ACOS'] = monthly_agg.apply(lambda r: round((r['Spends'] / r['Sales']) * 100, 2) if r['Sales'] > 0 else 0.0, axis=1)
 
@@ -859,23 +867,23 @@ if uploaded_files:
                 
                 prev_metrics = {
                     'Impressions': prev_df['_impressions'].sum(),
-                    'CPM': round((prev_df['_budget_consumed'].sum() / prev_df['_impressions'].sum()) * 1000) if prev_df['_impressions'].sum() > 0 else 0,
+                    'CPM': round((prev_df['_budget_consumed'].sum() / prev_df['_impressions'].sum()) * 1000, 2) if prev_df['_impressions'].sum() > 0 else 0.0,
                     'ATC': prev_df['_atc'].sum(),
                     'Orders': prev_df['_orders'].sum(),
                     'Spends': prev_df['_budget_consumed'].sum(),
                     'Sales': prev_df['_sales'].sum(),
-                    'ROAS': round(prev_df['_sales'].sum() / prev_df['_budget_consumed'].sum(), 2) if prev_df['_budget_consumed'].sum() > 0 else 0,
-                    'ACOS': round((prev_df['_budget_consumed'].sum() / prev_df['_sales'].sum()) * 100, 2) if prev_df['_sales'].sum() > 0 else 0
+                    'ROAS': round(prev_df['_sales'].sum() / prev_df['_budget_consumed'].sum(), 2) if prev_df['_budget_consumed'].sum() > 0 else 0.0,
+                    'ACOS': round((prev_df['_budget_consumed'].sum() / prev_df['_sales'].sum()) * 100, 2) if prev_df['_sales'].sum() > 0 else 0.0
                 }
                 curr_metrics = {
                     'Impressions': curr_df['_impressions'].sum(),
-                    'CPM': round((curr_df['_budget_consumed'].sum() / curr_df['_impressions'].sum()) * 1000) if curr_df['_impressions'].sum() > 0 else 0,
+                    'CPM': round((curr_df['_budget_consumed'].sum() / curr_df['_impressions'].sum()) * 1000, 2) if curr_df['_impressions'].sum() > 0 else 0.0,
                     'ATC': curr_df['_atc'].sum(),
                     'Orders': curr_df['_orders'].sum(),
                     'Spends': curr_df['_budget_consumed'].sum(),
                     'Sales': curr_df['_sales'].sum(),
-                    'ROAS': round(curr_df['_sales'].sum() / curr_df['_budget_consumed'].sum(), 2) if curr_df['_budget_consumed'].sum() > 0 else 0,
-                    'ACOS': round((curr_df['_budget_consumed'].sum() / curr_df['_sales'].sum()) * 100, 2) if curr_df['_sales'].sum() > 0 else 0
+                    'ROAS': round(curr_df['_sales'].sum() / curr_df['_budget_consumed'].sum(), 2) if curr_df['_budget_consumed'].sum() > 0 else 0.0,
+                    'ACOS': round((curr_df['_budget_consumed'].sum() / curr_df['_sales'].sum()) * 100, 2) if curr_df['_sales'].sum() > 0 else 0.0
                 }
 
                 pct_row = {'Month': 'Percentage %'}
@@ -1026,7 +1034,7 @@ if uploaded_files:
 
         with main_tab3:
             st.subheader("📊 Month-on-Month Comparison Tables")
-            st.caption("View chronological monthly summary & side-by-side MoM metrics with reverse-chronological month columns.")
+            st.caption("View chronological monthly summary & side-by-side MoM metrics sorted by highest spends with reverse-chronological month columns (serial for weekly).")
 
             all_cal_months = get_calendar_months_asc(final_df)
 
@@ -1140,7 +1148,7 @@ if uploaded_files:
                     st.info("No Keyword or Search Term column found.")
 
             with comp_sub_tab4:
-                st.markdown("#### Weekly Month-on-Month Comparison Table (Sorted by Highest Spends | Latest Month First)")
+                st.markdown("#### Weekly Month-on-Month Comparison Table (Serial Order: Week 1, 2, 3, 4, 5)")
                 w_months = month_filter_widget("weekly")
                 week_pivot = create_mom_comparison_table(final_df, 'Week', selected_months=w_months) if ('Week' in final_df.columns and final_df['Week'].notna().any()) else None
                 if week_pivot is not None and not week_pivot.empty:
@@ -1212,7 +1220,7 @@ if uploaded_files:
                     _sales=('_sales', 'sum')
                 ).reset_index()
 
-                monthly_summary['CPM'] = monthly_summary.apply(lambda r: round((r['_budget_consumed'] / r['_impressions']) * 1000) if r['_impressions'] > 0 else 0, axis=1)
+                monthly_summary['CPM'] = monthly_summary.apply(lambda r: round((r['_budget_consumed'] / r['_impressions']) * 1000, 2) if r['_impressions'] > 0 else 0.0, axis=1)
                 monthly_summary['ROAS'] = monthly_summary.apply(lambda r: round(r['_sales'] / r['_budget_consumed'], 2) if r['_budget_consumed'] > 0 else 0.0, axis=1)
                 monthly_summary['ACOS'] = monthly_summary.apply(lambda r: round((r['_budget_consumed'] / r['_sales']) * 100, 2) if r['_sales'] > 0 else 0.0, axis=1)
                 
@@ -1328,7 +1336,7 @@ if uploaded_files:
         with main_tab7:
             kw_col = None
             for c in ['Search Term', 'Keyword', 'Targeting Value']:
-                if c in filtered_df.columns:
+                if c in final_df.columns:
                     kw_col = c
                     break
             if kw_col:
