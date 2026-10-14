@@ -513,9 +513,11 @@ if uploaded_files:
                     month_series = dt_series.dt.strftime('%B').str.upper()
                     df['Month'] = month_series.fillna(fallback_month_name)
                     df['_date_dt'] = dt_series
+                    df['Date'] = dt_series.dt.strftime('%Y-%m-%d')
                 else:
                     df['Month'] = fallback_month_name
                     df['_date_dt'] = pd.NaT
+                    df['Date'] = np.nan
 
                 df_raw = df.copy()
                 if sheet_name not in consolidated_raw_tabs:
@@ -530,6 +532,13 @@ if uploaded_files:
                     df_consolidated.insert(0, 'Month', fallback_month_name)
                     
                 df_consolidated.insert(1, 'Tab Name', sheet_name)
+                
+                if 'Date' in df_consolidated.columns:
+                    col_date = df_consolidated.pop('Date')
+                    df_consolidated.insert(2, 'Date', col_date)
+                else:
+                    df_consolidated.insert(2, 'Date', np.nan)
+
                 consolidated_dfs.append(df_consolidated)
         except Exception as e:
             st.error(f"Error processing {uploaded_file.name}: {str(e)}")
@@ -537,7 +546,7 @@ if uploaded_files:
     if consolidated_dfs:
         final_df = pd.concat(consolidated_dfs, ignore_index=True)
         
-        base_cols = ['Month', 'Tab Name']
+        base_cols = ['Month', 'Tab Name', 'Date']
         product_listing_cols = []
         for df in consolidated_dfs:
             if 'PRODUCT_LISTING' in df['Tab Name'].values:
@@ -668,7 +677,6 @@ if uploaded_files:
 
             grouped = grouped.rename(columns={group_col: display_name})
             
-            # Sort by raw unrounded SPENDS descending
             grouped = grouped.sort_values(by='SPENDS', ascending=False).reset_index(drop=True)
 
             col_order = [display_name, 'IMPRESSIONS', 'CPM', 'ATC', 'ORDERS', 'SPENDS', 'SALES', 'ROAS', 'ACOS']
@@ -724,7 +732,6 @@ if uploaded_files:
             if is_weekly:
                 all_months_sorted = sorted(working_df['Month'].dropna().unique(), key=lambda w: int(''.join(filter(str.isdigit, str(w))) or 99))
             else:
-                # Chronological order: Initial months first (Jan -> Dec last)
                 all_months_sorted = sorted(all_months_asc, key=lambda x: MONTH_ORDER_ASC.get(str(x).strip().upper(), 99), reverse=False)
             
             pivot_df = pivot_df.reorder_levels([1, 0], axis=1)
@@ -777,7 +784,6 @@ if uploaded_files:
                     if m == expand_month:
                         m_df = working_df[working_df['Month'] == m].copy()
                         m_df['_day'] = m_df['_date_dt'].dt.day
-                        # Serial daily aggregation: sorted by day ascending (1, 2, 3...)
                         daily_agg = m_df.groupby('_day').agg(
                             Impressions=('_impressions', 'sum'),
                             ATC=('_atc', 'sum'),
@@ -1026,7 +1032,7 @@ if uploaded_files:
                     st.dataframe(format_dashboard_dataframe(sheets[selected_sheet].head(100)), use_container_width=True, hide_index=True)
 
         with main_tab2:
-            st.caption("Preview the combined dataset across all uploaded files (omitting the first summary tab).")
+            st.caption("Preview the combined dataset across all uploaded files, now including the standardized Date column.")
             preview_clean_df = final_df.drop(columns=['_impressions', '_direct_atc', '_indirect_atc', '_atc', '_direct_orders', '_indirect_orders', '_orders', '_direct_sales', '_indirect_sales', '_sales', '_budget_consumed', '_date_dt', 'Ad Type Combined'], errors='ignore')
             st.dataframe(format_dashboard_dataframe(preview_clean_df.head(100)), use_container_width=True, hide_index=True)
 
