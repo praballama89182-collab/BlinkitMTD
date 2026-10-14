@@ -496,8 +496,11 @@ if uploaded_files:
         
         try:
             xls = pd.ExcelFile(uploaded_file)
-            valid_sheet_names = xls.sheet_names[1:] if len(xls.sheet_names) > 1 else xls.sheet_names
             
+            # STRICTLY OMIT THE FIRST SHEET (xls.sheet_names[1:]), but skip Consolidated_Master if re-uploading master
+            sheets_to_process = xls.sheet_names[1:] if len(xls.sheet_names) > 1 else xls.sheet_names
+            valid_sheet_names = [s for s in sheets_to_process if s.strip().lower() not in ['consolidated_master', 'summary', 'overall']]
+
             for sheet_name in valid_sheet_names:
                 df = pd.read_excel(xls, sheet_name=sheet_name)
                 raw_files_dict[uploaded_file.name][sheet_name] = df.copy()
@@ -549,8 +552,8 @@ if uploaded_files:
         base_cols = ['Month', 'Tab Name', 'Date']
         product_listing_cols = []
         for df in consolidated_dfs:
-            if 'PRODUCT_LISTING' in df['Tab Name'].values:
-                pl_df = df[df['Tab Name'] == 'PRODUCT_LISTING']
+            if 'PRODUCT_LISTING' in str(df['Tab Name'].values).upper():
+                pl_df = df[df['Tab Name'].str.upper() == 'PRODUCT_LISTING']
                 product_listing_cols = [c for c in pl_df.columns if c not in base_cols]
                 break
         
@@ -1032,7 +1035,7 @@ if uploaded_files:
                     st.dataframe(format_dashboard_dataframe(sheets[selected_sheet].head(100)), use_container_width=True, hide_index=True)
 
         with main_tab2:
-            st.caption("Preview the combined dataset across all uploaded files, now including the standardized Date column.")
+            st.caption("Preview the combined dataset across all uploaded files (omitting the first summary tab).")
             preview_clean_df = final_df.drop(columns=['_impressions', '_direct_atc', '_indirect_atc', '_atc', '_direct_orders', '_indirect_orders', '_orders', '_direct_sales', '_indirect_sales', '_sales', '_budget_consumed', '_date_dt', 'Ad Type Combined'], errors='ignore')
             st.dataframe(format_dashboard_dataframe(preview_clean_df.head(100)), use_container_width=True, hide_index=True)
 
