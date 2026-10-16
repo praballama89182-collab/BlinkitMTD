@@ -276,7 +276,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
 
         start_data_row = 3
         for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=start_data_row):
-            is_grand_total = (str(idx_val).strip().lower() == 'grand total')
+            is_grand_total = (str(idx_val).strip().lower() in ['grand total', 'aggregate / average'])
             
             idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
             idx_cell.fill = total_fill if is_grand_total else index_fill
@@ -310,28 +310,29 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
             cell.border = thin_border
 
         for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=2):
+            is_grand_total = (str(idx_val).strip().lower() in ['grand total', 'aggregate / average'])
             for c_idx, (col_name, val) in enumerate(zip(pivot_df.columns, row_data), start=1):
                 val_cell = ws.cell(row=r_idx, column=c_idx)
-                val_cell.font = data_font
+                val_cell.font = total_font if is_grand_total else data_font
+                if is_grand_total:
+                    val_cell.fill = total_fill
                 val_cell.alignment = align_center
                 val_cell.border = thin_border
                 
                 if str(col_name).upper() in ['ACOS', 'TACOS'] and isinstance(val, (int, float, np.number)):
                     val_cell.value = val / 100.0 if val > 1 else val
                     val_cell.number_format = '0.00%'
-                elif isinstance(val, float):
+                elif isinstance(val, (int, float, np.number)):
                     val_cell.value = round(val, 2)
-                    val_cell.number_format = '#,##0.00'
-                elif isinstance(val, (int, np.integer)):
-                    val_cell.value = val
-                    val_cell.number_format = '#,##0'
+                    val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
                 else:
                     val_cell.value = val
 
+    # COMPRESSED COLUMN WIDTHS TO AVOID EXTRA BLANK SPACES
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = openpyxl.utils.get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 10)
 
     wb.save(buffer)
     buffer.seek(0)
@@ -401,7 +402,7 @@ def convert_all_pivots_to_excel(pivot_dict):
                     cell.border = thin_border
 
                 for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=3):
-                    is_grand_total = (str(idx_val).strip().lower() == 'grand total')
+                    is_grand_total = (str(idx_val).strip().lower() in ['grand total', 'aggregate / average'])
                     
                     idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
                     idx_cell.fill = total_fill if is_grand_total else index_fill
@@ -435,28 +436,29 @@ def convert_all_pivots_to_excel(pivot_dict):
                     cell.border = thin_border
 
                 for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=2):
+                    is_grand_total = (str(idx_val).strip().lower() in ['grand total', 'aggregate / average'])
                     for c_idx, (col_name, val) in enumerate(zip(pivot_df.columns, row_data), start=1):
                         val_cell = ws.cell(row=r_idx, column=c_idx)
-                        val_cell.font = data_font
+                        val_cell.font = total_font if is_grand_total else data_font
+                        if is_grand_total:
+                            val_cell.fill = total_fill
                         val_cell.alignment = align_center
                         val_cell.border = thin_border
                         
                         if str(col_name).upper() in ['ACOS', 'TACOS'] and isinstance(val, (int, float, np.number)):
                             val_cell.value = val / 100.0 if val > 1 else val
                             val_cell.number_format = '0.00%'
-                        elif isinstance(val, float):
+                        elif isinstance(val, (int, float, np.number)):
                             val_cell.value = round(val, 2)
-                            val_cell.number_format = '#,##0.00'
-                        elif isinstance(val, (int, np.integer)):
-                            val_cell.value = val
-                            val_cell.number_format = '#,##0'
+                            val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
                         else:
                             val_cell.value = val
 
+            # COMPRESSED COLUMN WIDTHS TO AVOID EXTRA BLANK SPACES
             for col in ws.columns:
                 max_len = max(len(str(cell.value or '')) for cell in col)
                 col_letter = openpyxl.utils.get_column_letter(col[0].column)
-                ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+                ws.column_dimensions[col_letter].width = max(max_len + 3, 10)
 
     wb.save(buffer)
     buffer.seek(0)
@@ -856,7 +858,44 @@ if uploaded_files:
                     row_data['Ad Orders'] = orders
 
                 rows.append(row_data)
-            return pd.DataFrame(rows)
+
+            res_df = pd.DataFrame(rows)
+            if not res_df.empty:
+                # DYNAMIC AGGREGATE / AVERAGE SUMMARY ROW FOR WEEKLY TABLE
+                n_weeks = len(weeks_list)
+                tot_imp = res_df['Impressions'].sum()
+                avg_cpm = round(res_df['CPM'].mean(), 2)
+                tot_spends = round(res_df['Spends'].sum(), 2)
+                tot_ad_sales = round(res_df['Ad Sales'].sum(), 2)
+                avg_ad_roas = round(tot_ad_sales / tot_spends, 2) if tot_spends > 0 else 0.0
+                tot_ad_orders = int(res_df['Ad Orders'].sum()) if 'Ad Orders' in res_df.columns else 0
+
+                summary_dict = {
+                    'Week': f'Aggregate / Average ({n_weeks} Wks)',
+                    'Impressions': tot_imp,
+                    'CPM': avg_cpm,
+                    'Spends': tot_spends,
+                    'Ad Sales': tot_ad_sales,
+                }
+                if has_sales:
+                    tot_ov_sales = round(res_df['Overall Sales'].sum(), 2) if 'Overall Sales' in res_df.columns else 0.0
+                    tot_ov_orders = int(res_df['Overall Orders'].sum()) if 'Overall Orders' in res_df.columns else 0
+                    avg_troas = round(tot_ov_sales / tot_spends, 2) if tot_spends > 0 else 0.0
+                    avg_tacos = round((tot_spends / tot_ov_sales) * 100, 2) if tot_ov_sales > 0 else 0.0
+                    summary_dict['Overall Sales'] = tot_ov_sales
+                    summary_dict['Ad ROAS'] = avg_ad_roas
+                    summary_dict['TROAS'] = avg_troas
+                    summary_dict['Ad Orders'] = tot_ad_orders
+                    summary_dict['Overall Orders'] = tot_ov_orders
+                    summary_dict['TACOS'] = f"{avg_tacos:.2f}%"
+                else:
+                    summary_dict['Ad ROAS'] = avg_ad_roas
+                    summary_dict['Ad Orders'] = tot_ad_orders
+
+                summary_row = pd.DataFrame([summary_dict])
+                res_df = pd.concat([res_df, summary_row], ignore_index=True)
+
+            return res_df
 
         def create_daily_tracker_table(selected_month):
             if master_sales_df.empty or '_sales_dt' not in master_sales_df.columns:
@@ -1038,7 +1077,6 @@ if uploaded_files:
         with main_tab3:
             st.subheader("📊 Month-on-Month Comparison Tables")
             
-            # WORKBOOK WITH ALL MOM SUB-TABS AS INDIVIDUAL SHEETS UNDER ONE FILE
             mom_dict = {
                 "Monthly_Summary": create_monthly_summary_table(final_df),
                 "Campaign_MoM": create_mom_comparison_table(final_df, 'Campaign Name') if 'Campaign Name' in final_df.columns else None,
@@ -1157,14 +1195,38 @@ if uploaded_files:
         with main_tab5:
             st.subheader("📍 City Level Overview & Product Performance")
             if not master_sales_df.empty:
-                state_units = master_sales_df.groupby('Supply State')['_qty'].sum()
-                valid_states = state_units[state_units > 0].index.tolist()
-                states_list = ["All States"] + sorted([str(x) for x in valid_states]) if 'Supply State' in master_sales_df.columns else ["All States"]
-                
-                sel_state = st.selectbox("Select Supply State (Min 1 Unit Sold):", states_list, key="city_state_sel")
+                # MONTH FILTER ABOVE STATE/CITY FILTERS
+                sales_months_avail = ["All Months"] + sorted(master_sales_df['Month'].dropna().unique().tolist(), key=lambda x: MONTH_ORDER_ASC.get(str(x).strip().upper(), 99))
+                sel_city_month = st.selectbox("Select Month for City View:", sales_months_avail, key="city_month_filter")
 
                 city_filtered_sales = master_sales_df.copy()
-                if sel_state != "All States" and 'Supply State' in master_sales_df.columns:
+                if sel_city_month != "All Months":
+                    city_filtered_sales = city_filtered_sales[city_filtered_sales['Month'] == sel_city_month]
+
+                # STATE DROPDOWN WITH SALES & ORDERS METRICS DISPLAYED ALONGSIDE
+                state_agg = city_filtered_sales.groupby('Supply State').agg(
+                    Total_Sales=('_gross_amt', 'sum'),
+                    Total_Orders=('Supply State', 'count')
+                ).reset_index()
+
+                all_states_total_sales = city_filtered_sales['_gross_amt'].sum()
+                all_states_total_orders = len(city_filtered_sales)
+
+                state_options = [f"All States | Total Sales: ₹{all_states_total_sales:,.2f} | Total Orders: {all_states_total_orders:,}"]
+                state_mapping = {state_options[0]: "All States"}
+
+                for _, row in state_agg.sort_values(by='Total_Sales', ascending=False).iterrows():
+                    st_name = str(row['Supply State'])
+                    st_sales = row['Total_Sales']
+                    st_orders = int(row['Total_Orders'])
+                    display_label = f"{st_name} | Sales: ₹{st_sales:,.2f} | Orders: {st_orders:,}"
+                    state_options.append(display_label)
+                    state_mapping[display_label] = st_name
+
+                sel_state_label = st.selectbox("Select Supply State (Min 1 Unit Sold):", state_options, key="city_state_sel")
+                sel_state = state_mapping.get(sel_state_label, "All States")
+
+                if sel_state != "All States" and 'Supply State' in city_filtered_sales.columns:
                     city_filtered_sales = city_filtered_sales[city_filtered_sales['Supply State'] == sel_state]
 
                 city_units = city_filtered_sales.groupby('Supply City')['_qty'].sum()
@@ -1196,21 +1258,21 @@ if uploaded_files:
                     st.markdown("---")
                     st.markdown("#### 🥧 State Contribution to Overall Sales & Orders")
                     
-                    state_contrib = master_sales_df.groupby('Supply State').agg(
-                        Total_Sales=('_gross_amt', 'sum'),
-                        Total_Orders=('Supply State', 'count')
-                    ).reset_index()
-                    state_contrib = state_contrib[state_contrib['Total_Sales'] > 0]
+                    state_contrib = state_agg[state_agg['Total_Sales'] > 0]
                     
                     if not state_contrib.empty:
                         fig_pie = px.pie(
                             state_contrib,
                             names='Supply State',
                             values='Total_Sales',
-                            title='State Contribution to Total Sales (₹)',
+                            title=f'State Contribution to Total Sales (₹) {f"- {sel_city_month}" if sel_city_month != "All Months" else ""}',
                             color_discrete_sequence=px.colors.sequential.Blues_r
                         )
-                        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+                        fig_pie.update_traces(
+                            textposition='inside', 
+                            textinfo='percent+label',
+                            hovertemplate='<b>%{label}</b><br>Sales: ₹%{value:,.2f}<br>Percentage: %{percent}<extra></extra>'
+                        )
                         fig_pie.update_layout(
                             template='plotly_white',
                             height=450,
