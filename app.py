@@ -170,6 +170,48 @@ st.markdown("""
 
 st.write("Upload up to 5 monthly Ad Campaign spreadsheets and up to 5 Sales Reports (.xlsx, .xls) to analyze TACOS, TROAS, Overall Sales, Orders, and multi-metric trends.")
 
+# Top-level helper function for grouped tables
+def compute_grouped_table(df_subset, group_col, selected_item="All", search_query=""):
+    if df_subset is None or df_subset.empty or group_col not in df_subset.columns:
+        return pd.DataFrame()
+    
+    df_working = df_subset.dropna(subset=[group_col]).copy()
+    df_working[group_col] = df_working[group_col].astype(str)
+    
+    if selected_item and selected_item != "All":
+        df_working = df_working[df_working[group_col] == selected_item]
+
+    if search_query and search_query.strip():
+        df_working = df_working[df_working[group_col].str.contains(search_query.strip(), case=False, na=False)]
+    
+    if df_working.empty:
+        return pd.DataFrame()
+
+    grouped = df_working.groupby(group_col).agg(
+        IMPRESSIONS=('_impressions', 'sum'),
+        ATC=('_atc', 'sum'),
+        ORDERS=('_orders', 'sum'),
+        SPENDS=('_budget_consumed', 'sum'),
+        SALES=('_sales', 'sum')
+    ).reset_index()
+
+    grouped['CPM'] = grouped.apply(lambda r: round((r['SPENDS'] / r['IMPRESSIONS']) * 1000, 2) if r['IMPRESSIONS'] > 0 else 0.0, axis=1)
+    grouped['ROAS'] = grouped.apply(lambda r: round(r['SALES'] / r['SPENDS'], 2) if r['SPENDS'] > 0 else 0.0, axis=1)
+    grouped['ACOS'] = grouped.apply(lambda r: round((r['SPENDS'] / r['SALES']) * 100, 2) if r['SALES'] > 0 else 0.0, axis=1)
+
+    display_name = group_col.upper()
+    if group_col == 'Campaign Name': display_name = 'CAMPAIGN NAME'
+    elif group_col == 'Ad Type Combined': display_name = 'MATCH / AD TYPE'
+
+    grouped = grouped.rename(columns={group_col: display_name})
+    grouped = grouped.sort_values(by='SPENDS', ascending=False).reset_index(drop=True)
+
+    col_order = [display_name, 'IMPRESSIONS', 'CPM', 'ATC', 'ORDERS', 'SPENDS', 'SALES', 'ROAS', 'ACOS']
+    res_df = grouped.reindex(columns=col_order)
+    res_df['SPENDS'] = res_df['SPENDS'].round(2)
+    res_df['SALES'] = res_df['SALES'].round(2)
+    return res_df
+
 def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     buffer = io.BytesIO()
     wb = openpyxl.Workbook()
@@ -187,7 +229,6 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     data_font = Font(name="Calibri", size=10, color="000000")
     
     align_center = Alignment(horizontal="center", vertical="center", wrap_text=False)
-    align_left = Alignment(horizontal="center", vertical="center", wrap_text=False)
     thin_border = Border(
         left=Side(style='thin', color='BFBFBF'),
         right=Side(style='thin', color='BFBFBF'),
@@ -267,15 +308,13 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
             cell.border = thin_border
 
         for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=2):
-            is_pct_row = (str(row_data.iloc[0]).strip().lower() == 'percentage %')
-            
             for c_idx, (col_name, val) in enumerate(zip(pivot_df.columns, row_data), start=1):
                 val_cell = ws.cell(row=r_idx, column=c_idx)
-                val_cell.font = total_font if is_pct_row else data_font
+                val_cell.font = data_font
                 val_cell.alignment = align_center
                 val_cell.border = thin_border
                 
-                if str(col_name).upper() in ['ACOS', 'TACOS'] and not is_pct_row and isinstance(val, (int, float, np.number)):
+                if str(col_name).upper() in ['ACOS', 'TACOS'] and isinstance(val, (int, float, np.number)):
                     val_cell.value = val / 100.0 if val > 1 else val
                     val_cell.number_format = '0.00%'
                 elif isinstance(val, float):
@@ -976,10 +1015,10 @@ if uploaded_files:
 
         with main_tab1:
             st.caption("Inspect individual sheets tab-by-tab for each uploaded file.")
-            selected_file_name = st.selectbox("Select Uploaded File to Preview:", list(raw_files_dict.keys()))
+            selected_file_name = st.selectbox("Select Uploaded File to Preview:", list(raw_files_dict.keys()), key="raw_file_sel")
             if selected_file_name:
                 sheets = raw_files_dict[selected_file_name]
-                selected_sheet = st.selectbox("Select Sheet Tab:", list(sheets.keys()))
+                selected_sheet = st.selectbox("Select Sheet Tab:", list(sheets.keys()), key="raw_sheet_sel")
                 if selected_sheet:
                     st.dataframe(format_dashboard_dataframe(sheets[selected_sheet].head(100)), use_container_width=True, hide_index=True)
 
@@ -991,7 +1030,6 @@ if uploaded_files:
         with main_tab3:
             st.subheader("📊 Month-on-Month Comparison Tables")
             
-            # GLOBAL DOWNLOAD ALL MOM TABLES AT ONCE BUTTON
             mom_dict = {
                 "Monthly_Summary": create_monthly_summary_table(final_df),
                 "Campaign_MoM": create_mom_comparison_table(final_df, 'Campaign Name') if 'Campaign Name' in final_df.columns else None,
@@ -1114,7 +1152,7 @@ if uploaded_files:
                 valid_states = state_units[state_units > 0].index.tolist()
                 states_list = ["All States"] + sorted([str(x) for x in valid_states]) if 'Supply State' in master_sales_df.columns else ["All States"]
                 
-                sel_state = st.selectbox("Select Supply State (Min 1 Unit Sold):", states_list)
+                sel_state = st.selectbox("Select Supply State (Min 1 Unit Sold):", states_list, key="city_state_sel")
 
                 city_filtered_sales = master_sales_df.copy()
                 if sel_state != "All States" and 'Supply State' in master_sales_df.columns:
@@ -1124,7 +1162,7 @@ if uploaded_files:
                 valid_cities = city_units[city_units > 0].index.tolist()
                 cities_list = ["All Cities"] + sorted([str(x) for x in valid_cities]) if 'Supply City' in city_filtered_sales.columns else ["All Cities"]
                 
-                sel_city = st.selectbox("Select Supply City (Min 1 Unit Sold):", cities_list)
+                sel_city = st.selectbox("Select Supply City (Min 1 Unit Sold):", cities_list, key="city_city_sel")
 
                 if sel_city != "All Cities" and 'Supply City' in city_filtered_sales.columns:
                     city_filtered_sales = city_filtered_sales[city_filtered_sales['Supply City'] == sel_city]
