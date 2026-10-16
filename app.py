@@ -25,6 +25,7 @@ st.markdown("""
         --dash-border: #C8DCEB;
         --dash-text: #29465B;
         --lavender-light: #F3EBFB;
+        --lavender-blue-mix: linear-gradient(135deg, #F3EBFB 0%, #EEF6FC 100%);
         --lavender-border: #D5C6E8;
     }
 
@@ -46,7 +47,7 @@ st.markdown("""
         background: linear-gradient(135deg, #FFFFFF 0%, #EEF6FF 100%);
         border: 1px solid var(--dash-border);
         border-left: 5px solid #6AA6CF;
-        border-radius: 12px;
+        border-radius: 14px;
         padding: 14px 18px;
         box-shadow: 0 3px 12px rgba(74, 144, 194, 0.10);
     }
@@ -61,18 +62,18 @@ st.markdown("""
         font-weight: 750 !important;
     }
 
-    /* CURVED & LIGHTEST LAVENDER SELECTBOXES AND TABS */
+    /* CURVED & LIGHTEST LAVENDER-BLUE MIXED TABS AND SELECTBOXES */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
-        background: var(--lavender-light);
+        background: var(--lavender-blue-mix);
         border: 1px solid var(--lavender-border);
-        border-radius: 14px;
+        border-radius: 16px;
         padding: 6px;
     }
 
     .stTabs [data-baseweb="tab"] {
         height: 42px;
-        border-radius: 10px;
+        border-radius: 12px;
         color: #4A3B6C;
         font-weight: 600;
         background: #FFFFFF;
@@ -82,12 +83,12 @@ st.markdown("""
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #6AA6CF, #4A90C2) !important;
         color: #FFFFFF !important;
-        box-shadow: 0 2px 7px rgba(74, 144, 194, 0.20);
+        box-shadow: 0 3px 9px rgba(74, 144, 194, 0.25);
         border: 0 !important;
     }
 
     [data-baseweb="select"] > div {
-        background-color: var(--lavender-light) !important;
+        background: var(--lavender-blue-mix) !important;
         border-color: var(--lavender-border) !important;
         border-radius: 12px !important;
     }
@@ -95,7 +96,7 @@ st.markdown("""
     [data-testid="stFileUploader"] {
         background: #FFFFFF;
         border: 1px solid var(--dash-border);
-        border-radius: 12px;
+        border-radius: 14px;
         padding: 8px;
         box-shadow: 0 2px 8px rgba(74, 144, 194, 0.07);
     }
@@ -103,7 +104,7 @@ st.markdown("""
     [data-testid="stFileUploaderDropzone"] {
         background: #F7FBFE;
         border: 1px dashed #9FC4DE;
-        border-radius: 9px;
+        border-radius: 10px;
     }
 
     [data-testid="stFileUploader"] button,
@@ -112,7 +113,7 @@ st.markdown("""
         background: linear-gradient(135deg, #6AA6CF, #4A90C2) !important;
         color: #FFFFFF !important;
         border: 0 !important;
-        border-radius: 10px !important;
+        border-radius: 12px !important;
         font-weight: 650 !important;
         box-shadow: 0 2px 7px rgba(11, 92, 173, 0.20);
     }
@@ -124,9 +125,10 @@ st.markdown("""
         color: #FFFFFF !important;
     }
 
+    /* CENTER ALIGNMENT FOR ALL DATAFRAME HEADERS & CELLS */
     [data-testid="stDataFrame"] {
         border: 1px solid var(--dash-border);
-        border-radius: 10px;
+        border-radius: 12px;
         overflow: hidden;
         box-shadow: 0 2px 9px rgba(11, 92, 173, 0.06);
     }
@@ -718,8 +720,6 @@ if uploaded_files:
                     'ATC': atc,
                     'Spends': spends,
                     'Ad Sales': sales,
-                    'ROAS': roas,
-                    'Ad Orders': ords,
                 }
                 
                 if has_sales:
@@ -730,9 +730,14 @@ if uploaded_files:
                     troas = round(ov_sales / spends, 2) if spends > 0 else 0.0
                     
                     row_dict['Overall Sales'] = ov_sales
+                    row_dict['Ad ROAS'] = roas
+                    row_dict['TROAS'] = troas
+                    row_dict['Ad Orders'] = ords
                     row_dict['Overall Orders'] = ov_orders
                     row_dict['TACOS'] = f"{tacos:.2f}%"
-                    row_dict['TROAS'] = troas
+                else:
+                    row_dict['Ad ROAS'] = roas
+                    row_dict['Ad Orders'] = ords
 
                 row_dict.update({
                     'ACOS': f"{acos:.2f}%"
@@ -830,8 +835,6 @@ if uploaded_files:
                     'CPM': cpm,
                     'Spends': spends,
                     'Ad Sales': sales,
-                    'Ad ROAS': ad_roas,
-                    'Ad Orders': orders
                 }
                 
                 if has_sales:
@@ -843,9 +846,14 @@ if uploaded_files:
                     troas = round(ov_sales / spends, 2) if spends > 0 else 0.0
                     
                     row_data['Overall Sales'] = ov_sales
+                    row_data['Ad ROAS'] = ad_roas
+                    row_data['TROAS'] = troas
+                    row_data['Ad Orders'] = orders
                     row_data['Overall Orders'] = ov_orders
                     row_data['TACOS'] = f"{tacos:.2f}%"
-                    row_data['TROAS'] = troas
+                else:
+                    row_data['Ad ROAS'] = ad_roas
+                    row_data['Ad Orders'] = orders
 
                 rows.append(row_data)
             return pd.DataFrame(rows)
@@ -891,12 +899,12 @@ if uploaded_files:
                     'Spends': day_spends,
                     'Ad Sales': day_ad_sales,
                     'Total Sales': ov_sales,
-                    'ROAS': roas,
+                    'Ad ROAS': roas,
+                    'TROAS': troas,
                     'Ad Orders': day_ad_orders,
                     'Total Orders': ov_orders,
                     'ATC': int(day_atc),
-                    'TACOS': f"{tacos:.2f}%",
-                    'TROAS': troas
+                    'TACOS': f"{tacos:.2f}%"
                 })
 
             res_df = pd.DataFrame(rows)
@@ -917,12 +925,12 @@ if uploaded_files:
                 'Spends': total_spends_sum,
                 'Ad Sales': total_ad_sales_sum,
                 'Total Sales': total_sales_sum,
-                'ROAS': avg_roas,
+                'Ad ROAS': avg_roas,
+                'TROAS': avg_troas,
                 'Ad Orders': total_ad_orders_sum,
                 'Total Orders': total_orders_sum,
                 'ATC': int(total_atc_sum),
-                'TACOS': f"{avg_tacos:.2f}%",
-                'TROAS': avg_troas
+                'TACOS': f"{avg_tacos:.2f}%"
             }])
             res_df = pd.concat([res_df, summary_row], ignore_index=True)
             return res_df
@@ -1030,6 +1038,7 @@ if uploaded_files:
         with main_tab3:
             st.subheader("📊 Month-on-Month Comparison Tables")
             
+            # WORKBOOK WITH ALL MOM SUB-TABS AS INDIVIDUAL SHEETS UNDER ONE FILE
             mom_dict = {
                 "Monthly_Summary": create_monthly_summary_table(final_df),
                 "Campaign_MoM": create_mom_comparison_table(final_df, 'Campaign Name') if 'Campaign Name' in final_df.columns else None,
@@ -1039,7 +1048,7 @@ if uploaded_files:
             }
             all_pivots_bytes = convert_all_pivots_to_excel(mom_dict)
             st.download_button(
-                label="📥 Download All MoM Comparison Tables (.xlsx - One File, All Tabs)",
+                label="📥 Download All MoM Comparison Tables (.xlsx - One Master File with All Sub-Tabs)",
                 data=all_pivots_bytes,
                 file_name="All_MoM_Comparison_Tables_Combined.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
