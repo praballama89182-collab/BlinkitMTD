@@ -62,7 +62,6 @@ st.markdown("""
         font-weight: 750 !important;
     }
 
-    /* CURVED & LIGHTEST LAVENDER-BLUE MIXED TABS AND SELECTBOXES */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
         background: var(--lavender-blue-mix);
@@ -891,18 +890,20 @@ if uploaded_files:
                 tacos = round((day_spends / ov_sales) * 100, 2) if ov_sales > 0 else 0.0
                 troas = round(ov_sales / day_spends, 2) if day_spends > 0 else 0.0
 
+                # REORDERED COLUMNS: IMPRESSIONS AFTER CPM, AD & TOTAL ORDERS AFTER SALES, ROAS/TROAS TOWARDS END
                 rows.append({
                     'Date (Day)': f"Day {day_i}",
                     'CPM': cpm,
+                    'Impressions': int(day_imp),
                     'Spends': day_spends,
                     'Ad Sales': day_ad_sales,
                     'Total Sales': ov_sales,
-                    'Ad ROAS': roas,
-                    'TROAS': troas,
                     'Ad Orders': day_ad_orders,
                     'Total Orders': ov_orders,
                     'ATC': int(day_atc),
-                    'TACOS': f"{tacos:.2f}%"
+                    'TACOS': f"{tacos:.2f}%",
+                    'Ad ROAS': roas,
+                    'TROAS': troas
                 })
 
             res_df = pd.DataFrame(rows)
@@ -912,6 +913,7 @@ if uploaded_files:
             total_ad_sales_sum = res_df['Ad Sales'].sum()
             total_ad_orders_sum = res_df['Ad Orders'].sum()
             total_atc_sum = res_df['ATC'].sum()
+            total_imp_sum = res_df['Impressions'].sum()
             avg_cpm = round(res_df['CPM'].mean(), 2)
             avg_roas = round(total_ad_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
             avg_tacos = round((total_spends_sum / total_sales_sum) * 100, 2) if total_sales_sum > 0 else 0.0
@@ -920,15 +922,16 @@ if uploaded_files:
             summary_row = pd.DataFrame([{
                 'Date (Day)': 'Aggregate / Average',
                 'CPM': avg_cpm,
+                'Impressions': total_imp_sum,
                 'Spends': total_spends_sum,
                 'Ad Sales': total_ad_sales_sum,
                 'Total Sales': total_sales_sum,
-                'Ad ROAS': avg_roas,
-                'TROAS': avg_troas,
                 'Ad Orders': total_ad_orders_sum,
                 'Total Orders': total_orders_sum,
                 'ATC': int(total_atc_sum),
-                'TACOS': f"{avg_tacos:.2f}%"
+                'TACOS': f"{avg_tacos:.2f}%",
+                'Ad ROAS': avg_roas,
+                'TROAS': avg_troas
             }])
             res_df = pd.concat([res_df, summary_row], ignore_index=True)
             return res_df
@@ -960,7 +963,6 @@ if uploaded_files:
             if df_to_show is None or df_to_show.empty:
                 return
             display_df = format_dashboard_dataframe(df_to_show)
-            # FORCE CENTER ALIGNMENT USING PANDAS STYLER
             styled_df = display_df.style.set_properties(**{
                 'text-align': 'center',
                 'vertical-align': 'middle'
@@ -1014,12 +1016,13 @@ if uploaded_files:
 
         st.markdown("### 📑 Navigation & Performance Breakdown")
         
+        # RENAMED "City Level Ov" TO "City Level"
         main_tab1, main_tab2, main_tab3, main_tab4, main_tab5 = st.tabs([
             "📄 Raw Files Preview",
             "📌 Consolidated Master",
             "📊 Comparison Tables (MoM)",
             "📅 Daily Tracker",
-            "📍 City Level Ov"
+            "📍 City Level"
         ])
 
         with main_tab1:
@@ -1167,7 +1170,7 @@ if uploaded_files:
                     st.info("No sales data available for the selected month.")
 
         with main_tab5:
-            st.subheader("📍 City Level Overview & Product Performance")
+            st.subheader("📍 City & State Level Overview & Product Performance")
             if not master_sales_df.empty:
                 sales_months_avail = ["All Months"] + sorted(master_sales_df['Month'].dropna().unique().tolist(), key=lambda x: MONTH_ORDER_ASC.get(str(x).strip().upper(), 99))
                 sel_city_month = st.selectbox("Select Month for City View:", sales_months_avail, key="city_month_filter")
@@ -1201,11 +1204,28 @@ if uploaded_files:
                 if sel_state != "All States" and 'Supply State' in city_filtered_sales.columns:
                     city_filtered_sales = city_filtered_sales[city_filtered_sales['Supply State'] == sel_state]
 
-                city_units = city_filtered_sales.groupby('Supply City')['_qty'].sum()
-                valid_cities = city_units[city_units > 0].index.tolist()
-                cities_list = ["All Cities"] + sorted([str(x) for x in valid_cities]) if 'Supply City' in city_filtered_sales.columns else ["All Cities"]
-                
-                sel_city = st.selectbox("Select Supply City (Min 1 Unit Sold):", cities_list, key="city_city_sel")
+                # CITY DROPDOWN WITH SALES & ORDERS METRICS DISPLAYED ALONGSIDE
+                city_agg = city_filtered_sales.groupby('Supply City').agg(
+                    Total_Sales=('_gross_amt', 'sum'),
+                    Total_Orders=('Supply City', 'count')
+                ).reset_index()
+
+                all_cities_total_sales = city_filtered_sales['_gross_amt'].sum()
+                all_cities_total_orders = len(city_filtered_sales)
+
+                city_options = [f"All Cities | Total Sales: ₹{all_cities_total_sales:,.2f} | Total Orders: {all_cities_total_orders:,}"]
+                city_mapping = {city_options[0]: "All Cities"}
+
+                for _, row in city_agg.sort_values(by='Total_Sales', ascending=False).iterrows():
+                    c_name = str(row['Supply City'])
+                    c_sales = row['Total_Sales']
+                    c_orders = int(row['Total_Orders'])
+                    display_label = f"{c_name} | Sales: ₹{c_sales:,.2f} | Orders: {c_orders:,}"
+                    city_options.append(display_label)
+                    city_mapping[display_label] = c_name
+
+                sel_city_label = st.selectbox("Select Supply City (Min 1 Unit Sold):", city_options, key="city_city_sel")
+                sel_city = city_mapping.get(sel_city_label, "All Cities")
 
                 if sel_city != "All Cities" and 'Supply City' in city_filtered_sales.columns:
                     city_filtered_sales = city_filtered_sales[city_filtered_sales['Supply City'] == sel_city]
@@ -1234,29 +1254,64 @@ if uploaded_files:
                     st.dataframe(prod_styled, use_container_width=True, hide_index=True)
                     
                     st.markdown("---")
-                    st.markdown("#### 🥧 State Contribution to Overall Sales & Orders")
+                    st.markdown("#### 🥧 Top 5 States & Top 5 Cities Contribution to Overall Sales & Orders (with AOV)")
                     
-                    state_contrib = state_agg[state_agg['Total_Sales'] > 0]
+                    # PREPARE TOP 5 STATES & TOP 5 CITIES WITH AOV COMPUTATION
+                    state_contrib = state_agg[state_agg['Total_Sales'] > 0].sort_values(by='Total_Sales', ascending=False).head(5).copy()
+                    state_contrib['AOV'] = state_contrib.apply(lambda r: round(r['Total_Sales'] / r['Total_Orders'], 2) if r['Total_Orders'] > 0 else 0.0, axis=1)
+
+                    full_city_agg = master_sales_df.groupby('Supply City').agg(
+                        Total_Sales=('_gross_amt', 'sum'),
+                        Total_Orders=('Supply City', 'count')
+                    ).reset_index()
+                    city_contrib = full_city_agg[full_city_agg['Total_Sales'] > 0].sort_values(by='Total_Sales', ascending=False).head(5).copy()
+                    city_contrib['AOV'] = city_contrib.apply(lambda r: round(r['Total_Sales'] / r['Total_Orders'], 2) if r['Total_Orders'] > 0 else 0.0, axis=1)
+
+                    col_p1, col_p2 = st.columns(2)
                     
-                    if not state_contrib.empty:
-                        fig_pie = px.pie(
-                            state_contrib,
-                            names='Supply State',
-                            values='Total_Sales',
-                            title=f'State Contribution to Total Sales (₹) {f"- {sel_city_month}" if sel_city_month != "All Months" else ""}',
-                            color_discrete_sequence=px.colors.sequential.Blues_r
-                        )
-                        fig_pie.update_traces(
-                            textposition='inside', 
-                            textinfo='percent+label',
-                            hovertemplate='<b>%{label}</b><br>Sales: ₹%{value:,.2f}<br>Percentage: %{percent}<extra></extra>'
-                        )
-                        fig_pie.update_layout(
-                            template='plotly_white',
-                            height=450,
-                            font=dict(family='Arial, sans-serif', color='#29465B')
-                        )
-                        st.plotly_chart(fig_pie, use_container_width=True)
+                    with col_p1:
+                        if not state_contrib.empty:
+                            fig_state_pie = px.pie(
+                                state_contrib,
+                                names='Supply State',
+                                values='Total_Sales',
+                                title=f'Top 5 States Contribution (₹)',
+                                color_discrete_sequence=['#285B7A', '#4A90C2', '#6AA6CF', '#8ABCE3', '#B4D6F0']
+                            )
+                            fig_state_pie.update_traces(
+                                textposition='inside', 
+                                textinfo='percent+label',
+                                hovertemplate='<b>State:</b> %{label}<br><b>Sales:</b> ₹%{value:,.2f}<br><b>Orders:</b> %{customdata[0]:,}<br><b>AOV:</b> ₹%{customdata[1]:,.2f}<br><b>Share:</b> %{percent}<extra></extra>',
+                                customdata=np.stack((state_contrib['Total_Orders'], state_contrib['AOV']), axis=-1)
+                            )
+                            fig_state_pie.update_layout(
+                                template='plotly_white',
+                                height=400,
+                                font=dict(family='Arial, sans-serif', color='#29465B')
+                            )
+                            st.plotly_chart(fig_state_pie, use_container_width=True)
+
+                    with col_p2:
+                        if not city_contrib.empty:
+                            fig_city_pie = px.pie(
+                                city_contrib,
+                                names='Supply City',
+                                values='Total_Sales',
+                                title=f'Top 5 Cities Contribution (₹)',
+                                color_discrete_sequence=['#1D4ED8', '#2563EB', '#3B82F6', '#60A5FA', '#93C5FD']
+                            )
+                            fig_city_pie.update_traces(
+                                textposition='inside', 
+                                textinfo='percent+label',
+                                hovertemplate='<b>City:</b> %{label}<br><b>Sales:</b> ₹%{value:,.2f}<br><b>Orders:</b> %{customdata[0]:,}<br><b>AOV:</b> ₹%{customdata[1]:,.2f}<br><b>Share:</b> %{percent}<extra></extra>',
+                                customdata=np.stack((city_contrib['Total_Orders'], city_contrib['AOV']), axis=-1)
+                            )
+                            fig_city_pie.update_layout(
+                                template='plotly_white',
+                                height=400,
+                                font=dict(family='Arial, sans-serif', color='#29465B')
+                            )
+                            st.plotly_chart(fig_city_pie, use_container_width=True)
                 else:
                     st.info("Required product/sales columns not found in sales report.")
             else:
