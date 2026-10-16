@@ -125,7 +125,7 @@ st.markdown("""
         color: #FFFFFF !important;
     }
 
-    /* CENTER ALIGNMENT FOR ALL DATAFRAME HEADERS & CELLS */
+    /* ABSOLUTE CENTER ALIGNMENT FOR ALL DATAFRAME HEADERS & CELLS */
     [data-testid="stDataFrame"] {
         border: 1px solid var(--dash-border);
         border-radius: 12px;
@@ -133,16 +133,21 @@ st.markdown("""
         box-shadow: 0 2px 9px rgba(11, 92, 173, 0.06);
     }
 
+    [data-testid="stDataFrame"] div[data-testid="stTable"] table,
+    [data-testid="stDataFrame"] table,
     [data-testid="stDataFrame"] th,
-    [data-testid="stDataFrame"] td {
+    [data-testid="stDataFrame"] td,
+    .stDataFrame td, .stDataFrame th {
         text-align: center !important;
-        vertical-align: middle !important;
+        justify-content: center !important;
+        alignment: center !important;
     }
 
     [data-testid="stDataFrame"] th {
         background: #E5F1F9 !important;
         color: #285B7A !important;
         font-weight: 700 !important;
+        text-align: center !important;
     }
 
     [data-testid="stRadio"] label,
@@ -286,7 +291,6 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 else:
                     val_cell.value = val
 
-    # COMPRESSED COLUMN WIDTHS TO AVOID EXTRA BLANK SPACES
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = openpyxl.utils.get_column_letter(col[0].column)
@@ -412,7 +416,6 @@ def convert_all_pivots_to_excel(pivot_dict):
                         else:
                             val_cell.value = val
 
-            # COMPRESSED COLUMN WIDTHS TO AVOID EXTRA BLANK SPACES
             for col in ws.columns:
                 max_len = max(len(str(cell.value or '')) for cell in col)
                 col_letter = openpyxl.utils.get_column_letter(col[0].column)
@@ -462,7 +465,6 @@ with scol5:
     s5 = st.file_uploader("Upload Sales File 5", type=["xlsx", "xls"], key="sales5")
     if s5: uploaded_sales_files.append(s5)
 
-# Process Sales Reports
 sales_dfs_list = []
 if uploaded_sales_files:
     for s_file in uploaded_sales_files:
@@ -958,8 +960,16 @@ if uploaded_files:
             if df_to_show is None or df_to_show.empty:
                 return
             display_df = format_dashboard_dataframe(df_to_show)
+            # FORCE CENTER ALIGNMENT USING PANDAS STYLER
+            styled_df = display_df.style.set_properties(**{
+                'text-align': 'center',
+                'vertical-align': 'middle'
+            }).set_table_styles([
+                {'selector': 'th', 'props': [('text-align', 'center'), ('vertical-align', 'middle'), ('background-color', '#E5F1F9'), ('color', '#285B7A')]},
+                {'selector': 'td', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]}
+            ])
             st.dataframe(
-                display_df,
+                styled_df,
                 use_container_width=True,
                 hide_index=False if (isinstance(df_to_show.index, pd.Index) and df_to_show.index.name) else True,
                 key=f"{key_prefix}_grid"
@@ -1004,7 +1014,6 @@ if uploaded_files:
 
         st.markdown("### 📑 Navigation & Performance Breakdown")
         
-        # EXACTLY 5 TABS ENDING AT CITY LEVEL OV
         main_tab1, main_tab2, main_tab3, main_tab4, main_tab5 = st.tabs([
             "📄 Raw Files Preview",
             "📌 Consolidated Master",
@@ -1020,12 +1029,24 @@ if uploaded_files:
                 sheets = raw_files_dict[selected_file_name]
                 selected_sheet = st.selectbox("Select Sheet Tab:", list(sheets.keys()), key="raw_sheet_sel")
                 if selected_sheet:
-                    st.dataframe(format_dashboard_dataframe(sheets[selected_sheet].head(100)), use_container_width=True, hide_index=True)
+                    raw_styled = format_dashboard_dataframe(sheets[selected_sheet].head(100)).style.set_properties(**{
+                        'text-align': 'center', 'vertical-align': 'middle'
+                    }).set_table_styles([
+                        {'selector': 'th', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]},
+                        {'selector': 'td', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]}
+                    ])
+                    st.dataframe(raw_styled, use_container_width=True, hide_index=True)
 
         with main_tab2:
             st.caption("Preview the combined dataset across all uploaded files.")
             preview_clean_df = final_df.drop(columns=['_impressions', '_direct_atc', '_indirect_atc', '_atc', '_direct_orders', '_indirect_orders', '_orders', '_direct_sales', '_indirect_sales', '_sales', '_budget_consumed', '_date_dt', 'Ad Type Combined'], errors='ignore')
-            st.dataframe(format_dashboard_dataframe(preview_clean_df.head(100)), use_container_width=True, hide_index=True)
+            master_styled = format_dashboard_dataframe(preview_clean_df.head(100)).style.set_properties(**{
+                'text-align': 'center', 'vertical-align': 'middle'
+            }).set_table_styles([
+                {'selector': 'th', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]},
+                {'selector': 'td', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]}
+            ])
+            st.dataframe(master_styled, use_container_width=True, hide_index=True)
 
         with main_tab3:
             st.subheader("📊 Month-on-Month Comparison Tables")
@@ -1204,7 +1225,13 @@ if uploaded_files:
                         'Units_Sold': 'UNITS SOLD',
                         'Total_Sales': 'TOTAL SALES AMOUNT (₹)'
                     })
-                    st.dataframe(format_dashboard_dataframe(prod_agg), use_container_width=True, hide_index=True)
+                    prod_styled = format_dashboard_dataframe(prod_agg).style.set_properties(**{
+                        'text-align': 'center', 'vertical-align': 'middle'
+                    }).set_table_styles([
+                        {'selector': 'th', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]},
+                        {'selector': 'td', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]}
+                    ])
+                    st.dataframe(prod_styled, use_container_width=True, hide_index=True)
                     
                     st.markdown("---")
                     st.markdown("#### 🥧 State Contribution to Overall Sales & Orders")
