@@ -890,7 +890,6 @@ if uploaded_files:
                 tacos = round((day_spends / ov_sales) * 100, 2) if ov_sales > 0 else 0.0
                 troas = round(ov_sales / day_spends, 2) if day_spends > 0 else 0.0
 
-                # REORDERED COLUMNS: IMPRESSIONS AFTER CPM, AD & TOTAL ORDERS AFTER SALES, ROAS/TROAS TOWARDS END
                 rows.append({
                     'Date (Day)': f"Day {day_i}",
                     'CPM': cpm,
@@ -1016,7 +1015,6 @@ if uploaded_files:
 
         st.markdown("### 📑 Navigation & Performance Breakdown")
         
-        # RENAMED "City Level Ov" TO "City Level"
         main_tab1, main_tab2, main_tab3, main_tab4, main_tab5 = st.tabs([
             "📄 Raw Files Preview",
             "📌 Consolidated Master",
@@ -1187,16 +1185,17 @@ if uploaded_files:
                 all_states_total_sales = city_filtered_sales['_gross_amt'].sum()
                 all_states_total_orders = len(city_filtered_sales)
 
-                state_options = [f"All States | Total Sales: ₹{all_states_total_sales:,.2f} | Total Orders: {all_states_total_orders:,}"]
+                # PROFESSIONAL FORMATTING FOR STATE DROPDOWN
+                state_options = [f"🌐 All States  •  Sales: ₹{all_states_total_sales:,.2f}  •  Orders: {all_states_total_orders:,}"]
                 state_mapping = {state_options[0]: "All States"}
 
                 for _, row in state_agg.sort_values(by='Total_Sales', ascending=False).iterrows():
-                    st_name = str(row['Supply State'])
+                    st_name = str(row['Supply State']).title()
                     st_sales = row['Total_Sales']
                     st_orders = int(row['Total_Orders'])
-                    display_label = f"{st_name} | Sales: ₹{st_sales:,.2f} | Orders: {st_orders:,}"
+                    display_label = f"📍 {st_name}  •  Sales: ₹{st_sales:,.2f}  •  Orders: {st_orders:,}"
                     state_options.append(display_label)
-                    state_mapping[display_label] = st_name
+                    state_mapping[display_label] = row['Supply State']
 
                 sel_state_label = st.selectbox("Select Supply State (Min 1 Unit Sold):", state_options, key="city_state_sel")
                 sel_state = state_mapping.get(sel_state_label, "All States")
@@ -1204,7 +1203,6 @@ if uploaded_files:
                 if sel_state != "All States" and 'Supply State' in city_filtered_sales.columns:
                     city_filtered_sales = city_filtered_sales[city_filtered_sales['Supply State'] == sel_state]
 
-                # CITY DROPDOWN WITH SALES & ORDERS METRICS DISPLAYED ALONGSIDE
                 city_agg = city_filtered_sales.groupby('Supply City').agg(
                     Total_Sales=('_gross_amt', 'sum'),
                     Total_Orders=('Supply City', 'count')
@@ -1213,16 +1211,17 @@ if uploaded_files:
                 all_cities_total_sales = city_filtered_sales['_gross_amt'].sum()
                 all_cities_total_orders = len(city_filtered_sales)
 
-                city_options = [f"All Cities | Total Sales: ₹{all_cities_total_sales:,.2f} | Total Orders: {all_cities_total_orders:,}"]
+                # PROFESSIONAL FORMATTING FOR CITY DROPDOWN
+                city_options = [f"🌐 All Cities  •  Sales: ₹{all_cities_total_sales:,.2f}  •  Orders: {all_cities_total_orders:,}"]
                 city_mapping = {city_options[0]: "All Cities"}
 
                 for _, row in city_agg.sort_values(by='Total_Sales', ascending=False).iterrows():
-                    c_name = str(row['Supply City'])
+                    c_name = str(row['Supply City']).title()
                     c_sales = row['Total_Sales']
                     c_orders = int(row['Total_Orders'])
-                    display_label = f"{c_name} | Sales: ₹{c_sales:,.2f} | Orders: {c_orders:,}"
+                    display_label = f"🏙️ {c_name}  •  Sales: ₹{c_sales:,.2f}  •  Orders: {c_orders:,}"
                     city_options.append(display_label)
-                    city_mapping[display_label] = c_name
+                    city_mapping[display_label] = row['Supply City']
 
                 sel_city_label = st.selectbox("Select Supply City (Min 1 Unit Sold):", city_options, key="city_city_sel")
                 sel_city = city_mapping.get(sel_city_label, "All Cities")
@@ -1256,8 +1255,8 @@ if uploaded_files:
                     st.markdown("---")
                     st.markdown("#### 🥧 Top 5 States & Top 5 Cities Contribution to Overall Sales & Orders (with AOV)")
                     
-                    # PREPARE TOP 5 STATES & TOP 5 CITIES WITH AOV COMPUTATION
                     state_contrib = state_agg[state_agg['Total_Sales'] > 0].sort_values(by='Total_Sales', ascending=False).head(5).copy()
+                    state_contrib['Supply State'] = state_contrib['Supply State'].astype(str).str.title()
                     state_contrib['AOV'] = state_contrib.apply(lambda r: round(r['Total_Sales'] / r['Total_Orders'], 2) if r['Total_Orders'] > 0 else 0.0, axis=1)
 
                     full_city_agg = master_sales_df.groupby('Supply City').agg(
@@ -1265,6 +1264,7 @@ if uploaded_files:
                         Total_Orders=('Supply City', 'count')
                     ).reset_index()
                     city_contrib = full_city_agg[full_city_agg['Total_Sales'] > 0].sort_values(by='Total_Sales', ascending=False).head(5).copy()
+                    city_contrib['Supply City'] = city_contrib['Supply City'].astype(str).str.title()
                     city_contrib['AOV'] = city_contrib.apply(lambda r: round(r['Total_Sales'] / r['Total_Orders'], 2) if r['Total_Orders'] > 0 else 0.0, axis=1)
 
                     col_p1, col_p2 = st.columns(2)
@@ -1298,7 +1298,7 @@ if uploaded_files:
                                 names='Supply City',
                                 values='Total_Sales',
                                 title=f'Top 5 Cities Contribution (₹)',
-                                color_discrete_sequence=['#1D4ED8', '#2563EB', '#3B82F6', '#60A5FA', '#93C5FD']
+                                color_discrete_sequence=['#0F4C81', '#1D63B8', '#3882E6', '#60A5FA', '#93C5FD']
                             )
                             fig_city_pie.update_traces(
                                 textposition='inside', 
