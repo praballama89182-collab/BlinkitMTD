@@ -3,6 +3,7 @@ import io
 import pandas as pd
 import numpy as np
 import streamlit as st
+import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import openpyxl
@@ -23,6 +24,8 @@ st.markdown("""
         --dash-blue-soft: #DCECF8;
         --dash-border: #C8DCEB;
         --dash-text: #29465B;
+        --lavender-light: #F3EBFB;
+        --lavender-border: #D5C6E8;
     }
 
     .stApp {
@@ -58,25 +61,35 @@ st.markdown("""
         font-weight: 750 !important;
     }
 
+    /* CURVED & LIGHTEST LAVENDER SELECTBOXES AND TABS */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 5px;
-        background: #F0F7FC;
-        border: 1px solid var(--dash-border);
-        border-radius: 12px;
-        padding: 5px;
+        gap: 6px;
+        background: var(--lavender-light);
+        border: 1px solid var(--lavender-border);
+        border-radius: 14px;
+        padding: 6px;
     }
 
     .stTabs [data-baseweb="tab"] {
         height: 42px;
-        border-radius: 7px;
-        color: #315A7D;
+        border-radius: 10px;
+        color: #4A3B6C;
         font-weight: 600;
+        background: #FFFFFF;
+        border: 1px solid #E2D6F3;
     }
 
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #6AA6CF, #4A90C2) !important;
         color: #FFFFFF !important;
         box-shadow: 0 2px 7px rgba(74, 144, 194, 0.20);
+        border: 0 !important;
+    }
+
+    [data-baseweb="select"] > div {
+        background-color: var(--lavender-light) !important;
+        border-color: var(--lavender-border) !important;
+        border-radius: 12px !important;
     }
 
     [data-testid="stFileUploader"] {
@@ -99,7 +112,7 @@ st.markdown("""
         background: linear-gradient(135deg, #6AA6CF, #4A90C2) !important;
         color: #FFFFFF !important;
         border: 0 !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         font-weight: 650 !important;
         box-shadow: 0 2px 7px rgba(11, 92, 173, 0.20);
     }
@@ -128,11 +141,6 @@ st.markdown("""
         background: #E5F1F9 !important;
         color: #285B7A !important;
         font-weight: 700 !important;
-    }
-
-    [data-baseweb="select"] > div {
-        border-color: #AFC7DF !important;
-        border-radius: 8px !important;
     }
 
     [data-testid="stRadio"] label,
@@ -179,7 +187,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     data_font = Font(name="Calibri", size=10, color="000000")
     
     align_center = Alignment(horizontal="center", vertical="center", wrap_text=False)
-    align_left = Alignment(horizontal="left", vertical="center", wrap_text=False)
+    align_left = Alignment(horizontal="center", vertical="center", wrap_text=False)
     thin_border = Border(
         left=Side(style='thin', color='BFBFBF'),
         right=Side(style='thin', color='BFBFBF'),
@@ -230,7 +238,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
             idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
             idx_cell.fill = total_fill if is_grand_total else index_fill
             idx_cell.font = total_font if is_grand_total else index_font
-            idx_cell.alignment = align_left
+            idx_cell.alignment = align_center
             idx_cell.border = thin_border
 
             for c_idx, (m_col, val) in enumerate(zip(metrics, row_data), start=2):
@@ -279,25 +287,135 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 else:
                     val_cell.value = val
 
-                if is_pct_row and c_idx > 1:
-                    val_str = str(val).replace('%', '').replace('+', '').strip()
-                    try:
-                        num_v = float(val_str)
-                        if num_v < 0:
-                            val_cell.fill = PatternFill(start_color="F8D7DA", end_color="F8D7DA", fill_type="solid")
-                            val_cell.font = Font(name="Calibri", size=10, bold=True, color="721C24")
-                        elif num_v > 0:
-                            val_cell.fill = PatternFill(start_color="D4EDDA", end_color="D4EDDA", fill_type="solid")
-                            val_cell.font = Font(name="Calibri", size=10, bold=True, color="155724")
-                    except ValueError:
-                        pass
-                elif is_pct_row:
-                    val_cell.fill = sec_header_fill
-
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = openpyxl.utils.get_column_letter(col[0].column)
         ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+def convert_all_pivots_to_excel(pivot_dict):
+    buffer = io.BytesIO()
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+
+    top_header_fill = PatternFill(start_color="4A90C2", end_color="4A90C2", fill_type="solid")
+    top_header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    sec_header_fill = PatternFill(start_color="E5F1F9", end_color="E5F1F9", fill_type="solid")
+    sec_header_font = Font(name="Calibri", size=10, bold=True, color="285B7A")
+    index_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+    index_font = Font(name="Calibri", size=10, bold=True, color="000000")
+    total_fill = PatternFill(start_color="E9ECEF", end_color="E9ECEF", fill_type="solid")
+    total_font = Font(name="Calibri", size=10, bold=True, color="000000")
+    data_font = Font(name="Calibri", size=10, color="000000")
+    
+    align_center = Alignment(horizontal="center", vertical="center", wrap_text=False)
+    thin_border = Border(
+        left=Side(style='thin', color='BFBFBF'),
+        right=Side(style='thin', color='BFBFBF'),
+        top=Side(style='thin', color='BFBFBF'),
+        bottom=Side(style='thin', color='BFBFBF')
+    )
+
+    for sheet_name, pivot_df in pivot_dict.items():
+        if pivot_df is not None and not pivot_df.empty:
+            ws = wb.create_sheet(title=sheet_name[:31])
+
+            if isinstance(pivot_df.columns, pd.MultiIndex):
+                metrics = pivot_df.columns.get_level_values(1)
+                entity_title = pivot_df.index.name if pivot_df.index.name else ""
+
+                ws.cell(row=1, column=1, value="").fill = top_header_fill
+                ws.cell(row=1, column=1).border = thin_border
+                
+                current_col = 2
+                for month in pivot_df.columns.get_level_values(0).unique():
+                    sub_cols = [c for c in pivot_df.columns if c[0] == month]
+                    num_sub = len(sub_cols)
+                    if num_sub > 1:
+                        ws.merge_cells(start_row=1, start_column=current_col, end_row=1, end_column=current_col + num_sub - 1)
+                    cell = ws.cell(row=1, column=current_col, value=str(month))
+                    cell.fill = top_header_fill
+                    cell.font = top_header_font
+                    cell.alignment = align_center
+                    
+                    for c in range(current_col, current_col + num_sub):
+                        ws.cell(row=1, column=c).border = thin_border
+                        ws.cell(row=1, column=c).fill = top_header_fill
+                    current_col += num_sub
+
+                cell_a2 = ws.cell(row=2, column=1, value=str(entity_title))
+                cell_a2.fill = index_fill
+                cell_a2.font = index_font
+                cell_a2.alignment = align_center
+                cell_a2.border = thin_border
+
+                for col_idx, metric in enumerate(metrics, start=2):
+                    cell = ws.cell(row=2, column=col_idx, value=str(metric))
+                    cell.fill = sec_header_fill
+                    cell.font = sec_header_font
+                    cell.alignment = align_center
+                    cell.border = thin_border
+
+                for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=3):
+                    is_grand_total = (str(idx_val).strip().lower() == 'grand total')
+                    
+                    idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
+                    idx_cell.fill = total_fill if is_grand_total else index_fill
+                    idx_cell.font = total_font if is_grand_total else index_font
+                    idx_cell.alignment = align_center
+                    idx_cell.border = thin_border
+
+                    for c_idx, (m_col, val) in enumerate(zip(metrics, row_data), start=2):
+                        val_cell = ws.cell(row=r_idx, column=c_idx)
+                        val_cell.font = total_font if is_grand_total else data_font
+                        if is_grand_total:
+                            val_cell.fill = total_fill
+                        val_cell.alignment = align_center
+                        val_cell.border = thin_border
+
+                        if isinstance(val, (int, float, np.number)):
+                            if str(m_col).upper() in ['ACOS', 'TACOS']:
+                                val_cell.value = val / 100.0 if val > 1 else val
+                                val_cell.number_format = '0.00%'
+                            else:
+                                val_cell.value = round(val, 2)
+                                val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
+                        else:
+                            val_cell.value = val
+            else:
+                for col_idx, col_name in enumerate(pivot_df.columns, start=1):
+                    cell = ws.cell(row=1, column=col_idx, value=str(col_name))
+                    cell.fill = top_header_fill
+                    cell.font = top_header_font
+                    cell.alignment = align_center
+                    cell.border = thin_border
+
+                for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=2):
+                    for c_idx, (col_name, val) in enumerate(zip(pivot_df.columns, row_data), start=1):
+                        val_cell = ws.cell(row=r_idx, column=c_idx)
+                        val_cell.font = data_font
+                        val_cell.alignment = align_center
+                        val_cell.border = thin_border
+                        
+                        if str(col_name).upper() in ['ACOS', 'TACOS'] and isinstance(val, (int, float, np.number)):
+                            val_cell.value = val / 100.0 if val > 1 else val
+                            val_cell.number_format = '0.00%'
+                        elif isinstance(val, float):
+                            val_cell.value = round(val, 2)
+                            val_cell.number_format = '#,##0.00'
+                        elif isinstance(val, (int, np.integer)):
+                            val_cell.value = val
+                            val_cell.number_format = '#,##0'
+                        else:
+                            val_cell.value = val
+
+            for col in ws.columns:
+                max_len = max(len(str(cell.value or '')) for cell in col)
+                col_letter = openpyxl.utils.get_column_letter(col[0].column)
+                ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
 
     wb.save(buffer)
     buffer.seek(0)
@@ -360,6 +478,7 @@ if sales_dfs_list:
     master_sales_df = pd.concat(sales_dfs_list, ignore_index=True)
     date_cand = next((c for c in ['Order Date', 'date', 'Date', 'ORDER_DATE'] if c in master_sales_df.columns), None)
     gross_cand = next((c for c in ['Total Gross Bill Amount', 'Gross Amount', 'Total Amount', 'Bill Amount'] if c in master_sales_df.columns), None)
+    qty_cand = next((c for c in ['Quantity', 'Qty', 'Units'] if c in master_sales_df.columns), None)
             
     if date_cand:
         master_sales_df['_sales_dt'] = pd.to_datetime(master_sales_df[date_cand], errors='coerce')
@@ -370,6 +489,10 @@ if sales_dfs_list:
         master_sales_df['_gross_amt'] = pd.to_numeric(master_sales_df[gross_cand], errors='coerce').fillna(0.0)
     else:
         master_sales_df['_gross_amt'] = 0.0
+    if qty_cand:
+        master_sales_df['_qty'] = pd.to_numeric(master_sales_df[qty_cand], errors='coerce').fillna(0.0)
+    else:
+        master_sales_df['_qty'] = 1.0
 
 if uploaded_files:
     consolidated_dfs = []
@@ -516,47 +639,6 @@ if uploaded_files:
         else:
             final_df['Week'] = np.nan
 
-        def compute_grouped_table(df_subset, group_col, selected_item="All", search_query=""):
-            if group_col not in df_subset.columns:
-                return pd.DataFrame()
-            
-            df_working = df_subset.dropna(subset=[group_col]).copy()
-            df_working[group_col] = df_working[group_col].astype(str)
-            
-            if selected_item and selected_item != "All":
-                df_working = df_working[df_working[group_col] == selected_item]
-
-            if search_query and search_query.strip():
-                df_working = df_working[df_working[group_col].str.contains(search_query.strip(), case=False, na=False)]
-            
-            if df_working.empty:
-                return pd.DataFrame()
-
-            grouped = df_working.groupby(group_col).agg(
-                IMPRESSIONS=('_impressions', 'sum'),
-                ATC=('_atc', 'sum'),
-                ORDERS=('_orders', 'sum'),
-                SPENDS=('_budget_consumed', 'sum'),
-                SALES=('_sales', 'sum')
-            ).reset_index()
-
-            grouped['CPM'] = grouped.apply(lambda r: round((r['SPENDS'] / r['IMPRESSIONS']) * 1000, 2) if r['IMPRESSIONS'] > 0 else 0.0, axis=1)
-            grouped['ROAS'] = grouped.apply(lambda r: round(r['SALES'] / r['SPENDS'], 2) if r['SPENDS'] > 0 else 0.0, axis=1)
-            grouped['ACOS'] = grouped.apply(lambda r: round((r['SPENDS'] / r['SALES']) * 100, 2) if r['SALES'] > 0 else 0.0, axis=1)
-
-            display_name = group_col.upper()
-            if group_col == 'Campaign Name': display_name = 'CAMPAIGN NAME'
-            elif group_col == 'Ad Type Combined': display_name = 'MATCH / AD TYPE'
-
-            grouped = grouped.rename(columns={group_col: display_name})
-            grouped = grouped.sort_values(by='SPENDS', ascending=False).reset_index(drop=True)
-
-            col_order = [display_name, 'IMPRESSIONS', 'CPM', 'ATC', 'ORDERS', 'SPENDS', 'SALES', 'ROAS', 'ACOS']
-            res_df = grouped.reindex(columns=col_order)
-            res_df['SPENDS'] = res_df['SPENDS'].round(2)
-            res_df['SALES'] = res_df['SALES'].round(2)
-            return res_df
-
         MONTH_ORDER_ASC = {
             "JANUARY": 1, "FEBRUARY": 2, "MARCH": 3, "APRIL": 4,
             "MAY": 5, "JUNE": 6, "JULY": 7, "AUGUST": 8,
@@ -595,7 +677,10 @@ if uploaded_files:
                     'Impressions': imp,
                     'CPM': cpm,
                     'ATC': atc,
-                    'Orders': ords,
+                    'Spends': spends,
+                    'Ad Sales': sales,
+                    'ROAS': roas,
+                    'Ad Orders': ords,
                 }
                 
                 if has_sales:
@@ -611,9 +696,6 @@ if uploaded_files:
                     row_dict['TROAS'] = troas
 
                 row_dict.update({
-                    'Spends': spends,
-                    'Sales': sales,
-                    'ROAS': roas,
                     'ACOS': f"{acos:.2f}%"
                 })
                 rows_list.append(row_dict)
@@ -696,13 +778,17 @@ if uploaded_files:
             rows = []
             for w in weeks_list:
                 w_df = working_df[working_df['Week'] == w]
+                imp = w_df['_impressions'].sum()
                 spends = round(w_df['_budget_consumed'].sum(), 2)
                 sales = round(w_df['_sales'].sum(), 2)
                 orders = int(w_df['_orders'].sum())
+                cpm = round((spends / imp) * 1000, 2) if imp > 0 else 0.0
                 ad_roas = round(sales / spends, 2) if spends > 0 else 0.0
                 
                 row_data = {
                     'Week': w,
+                    'Impressions': imp,
+                    'CPM': cpm,
                     'Spends': spends,
                     'Ad Sales': sales,
                     'Ad ROAS': ad_roas,
@@ -904,6 +990,26 @@ if uploaded_files:
 
         with main_tab3:
             st.subheader("📊 Month-on-Month Comparison Tables")
+            
+            # GLOBAL DOWNLOAD ALL MOM TABLES AT ONCE BUTTON
+            mom_dict = {
+                "Monthly_Summary": create_monthly_summary_table(final_df),
+                "Campaign_MoM": create_mom_comparison_table(final_df, 'Campaign Name') if 'Campaign Name' in final_df.columns else None,
+                "AdType_MoM": create_mom_comparison_table(final_df, 'Ad Type Combined') if 'Ad Type Combined' in final_df.columns else None,
+                "Keyword_MoM": create_mom_comparison_table(final_df, next((c for c in ['Search Term', 'Keyword', 'Targeting Value'] if c in final_df.columns), None)) if next((c for c in ['Search Term', 'Keyword', 'Targeting Value'] if c in final_df.columns), None) else None,
+                "Weekly_MoM": create_weekly_comparison_table_with_sales(final_df)
+            }
+            all_pivots_bytes = convert_all_pivots_to_excel(mom_dict)
+            st.download_button(
+                label="📥 Download All MoM Comparison Tables (.xlsx - One File, All Tabs)",
+                data=all_pivots_bytes,
+                file_name="All_MoM_Comparison_Tables_Combined.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="btn_dl_all_mom_pivots",
+                type="primary"
+            )
+            st.markdown("---")
+
             comp_sub_tab0, comp_sub_tab1, comp_sub_tab2, comp_sub_tab3, comp_sub_tab4 = st.tabs([
                 "📅 Monthly Summary",
                 "🎯 Campaign Comparison",
@@ -927,25 +1033,61 @@ if uploaded_files:
                     )
 
             with comp_sub_tab1:
+                st.markdown("#### Campaign Comparison Table")
                 camp_pivot = create_mom_comparison_table(final_df, 'Campaign Name') if 'Campaign Name' in final_df.columns else None
                 if camp_pivot is not None and not camp_pivot.empty:
                     render_unified_single_table(camp_pivot, key_prefix="camp_pivot_tab")
+                    excel_camp = style_and_export_pivot(camp_pivot, sheet_name="Campaign_MoM")
+                    st.download_button(
+                        label="📥 Download Campaign Comparison Table (.xlsx)",
+                        data=excel_camp,
+                        file_name="Campaign_MoM_Comparison_Report.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="btn_dl_camp_pivot"
+                    )
 
             with comp_sub_tab2:
+                st.markdown("#### Ad Type Comparison Table")
                 ad_pivot = create_mom_comparison_table(final_df, 'Ad Type Combined') if 'Ad Type Combined' in final_df.columns else None
                 if ad_pivot is not None and not ad_pivot.empty:
                     render_unified_single_table(ad_pivot, key_prefix="ad_pivot_tab")
+                    excel_ad = style_and_export_pivot(ad_pivot, sheet_name="AdType_MoM")
+                    st.download_button(
+                        label="📥 Download Ad Type Comparison Table (.xlsx)",
+                        data=excel_ad,
+                        file_name="Ad_Type_MoM_Comparison_Report.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="btn_dl_ad_pivot"
+                    )
 
             with comp_sub_tab3:
+                st.markdown("#### Keyword Comparison Table")
                 kw_col = next((c for c in ['Search Term', 'Keyword', 'Targeting Value'] if c in final_df.columns), None)
                 kw_pivot = create_mom_comparison_table(final_df, kw_col) if kw_col else None
                 if kw_pivot is not None and not kw_pivot.empty:
                     render_unified_single_table(kw_pivot, key_prefix="kw_pivot_tab")
+                    excel_kw = style_and_export_pivot(kw_pivot, sheet_name="Keyword_MoM")
+                    st.download_button(
+                        label="📥 Download Keyword Comparison Table (.xlsx)",
+                        data=excel_kw,
+                        file_name="Keyword_MoM_Comparison_Report.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="btn_dl_kw_pivot"
+                    )
 
             with comp_sub_tab4:
+                st.markdown("#### Weekly Comparison Table")
                 weekly_comp_df = create_weekly_comparison_table_with_sales(final_df)
                 if not weekly_comp_df.empty:
                     render_unified_single_table(weekly_comp_df, key_prefix="weekly_comp_tab")
+                    excel_week = style_and_export_pivot(weekly_comp_df, sheet_name="Weekly_MoM")
+                    st.download_button(
+                        label="📥 Download Weekly Comparison Table (.xlsx)",
+                        data=excel_week,
+                        file_name="Weekly_MoM_Comparison_Report.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="btn_dl_week_pivot"
+                    )
 
         with main_tab4:
             st.subheader("📅 Daily Tracker")
@@ -968,15 +1110,21 @@ if uploaded_files:
         with main_tab5:
             st.subheader("📍 City Level Overview & Product Performance")
             if not master_sales_df.empty:
-                states_list = ["All States"] + sorted([str(x) for x in master_sales_df['Supply State'].dropna().unique()]) if 'Supply State' in master_sales_df.columns else ["All States"]
-                sel_state = st.selectbox("Select Supply State:", states_list)
+                state_units = master_sales_df.groupby('Supply State')['_qty'].sum()
+                valid_states = state_units[state_units > 0].index.tolist()
+                states_list = ["All States"] + sorted([str(x) for x in valid_states]) if 'Supply State' in master_sales_df.columns else ["All States"]
+                
+                sel_state = st.selectbox("Select Supply State (Min 1 Unit Sold):", states_list)
 
                 city_filtered_sales = master_sales_df.copy()
                 if sel_state != "All States" and 'Supply State' in master_sales_df.columns:
                     city_filtered_sales = city_filtered_sales[city_filtered_sales['Supply State'] == sel_state]
 
-                cities_list = ["All Cities"] + sorted([str(x) for x in city_filtered_sales['Supply City'].dropna().unique()]) if 'Supply City' in city_filtered_sales.columns else ["All Cities"]
-                sel_city = st.selectbox("Select Supply City:", cities_list)
+                city_units = city_filtered_sales.groupby('Supply City')['_qty'].sum()
+                valid_cities = city_units[city_units > 0].index.tolist()
+                cities_list = ["All Cities"] + sorted([str(x) for x in valid_cities]) if 'Supply City' in city_filtered_sales.columns else ["All Cities"]
+                
+                sel_city = st.selectbox("Select Supply City (Min 1 Unit Sold):", cities_list)
 
                 if sel_city != "All Cities" and 'Supply City' in city_filtered_sales.columns:
                     city_filtered_sales = city_filtered_sales[city_filtered_sales['Supply City'] == sel_city]
@@ -997,6 +1145,31 @@ if uploaded_files:
                         'Total_Sales': 'TOTAL SALES AMOUNT (₹)'
                     })
                     st.dataframe(format_dashboard_dataframe(prod_agg), use_container_width=True, hide_index=True)
+                    
+                    st.markdown("---")
+                    st.markdown("#### 🥧 State Contribution to Overall Sales & Orders")
+                    
+                    state_contrib = master_sales_df.groupby('Supply State').agg(
+                        Total_Sales=('_gross_amt', 'sum'),
+                        Total_Orders=('Supply State', 'count')
+                    ).reset_index()
+                    state_contrib = state_contrib[state_contrib['Total_Sales'] > 0]
+                    
+                    if not state_contrib.empty:
+                        fig_pie = px.pie(
+                            state_contrib,
+                            names='Supply State',
+                            values='Total_Sales',
+                            title='State Contribution to Total Sales (₹)',
+                            color_discrete_sequence=px.colors.sequential.Blues_r
+                        )
+                        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+                        fig_pie.update_layout(
+                            template='plotly_white',
+                            height=450,
+                            font=dict(family='Arial, sans-serif', color='#29465B')
+                        )
+                        st.plotly_chart(fig_pie, use_container_width=True)
                 else:
                     st.info("Required product/sales columns not found in sales report.")
             else:
@@ -1039,6 +1212,27 @@ if uploaded_files:
                 st.markdown("#### 📅 Weekly Trend")
                 wk_df = compute_grouped_table(filtered_df, 'Week', "All")
                 st.dataframe(format_dashboard_dataframe(wk_df), use_container_width=True, hide_index=True)
+
+        st.markdown("---")
+        st.subheader("💾 Download Consolidated Master Workbook")
+        buffer_multi = io.BytesIO()
+        with pd.ExcelWriter(buffer_multi, engine='openpyxl') as writer:
+            for raw_tab_name, df_list in consolidated_raw_tabs.items():
+                combined_raw_tab_df = pd.concat(df_list, ignore_index=True)
+                clean_sheet_name = raw_tab_name[:31]
+                combined_raw_tab_df.to_excel(writer, sheet_name=clean_sheet_name, index=False)
+            
+            master_export_df = final_df.drop(columns=['_impressions', '_direct_atc', '_indirect_atc', '_atc', '_direct_orders', '_indirect_orders', '_orders', '_direct_sales', '_indirect_sales', '_sales', '_budget_consumed', '_date_dt', 'Ad Type Combined'], errors='ignore')
+            master_export_df.to_excel(writer, sheet_name='Consolidated_Master', index=False)
+
+        buffer_multi.seek(0)
+        st.download_button(
+            label="📥 Download Complete Excel Workbook (Consolidated Raw Tabs + Final Master Tab)",
+            data=buffer_multi,
+            file_name="Blinkit_Consolidated_Master_Report.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            type="primary"
+        )
 
     else:
         st.info("Please upload valid ad campaign reports to start analysis.")
