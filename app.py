@@ -74,7 +74,7 @@ st.markdown("""
     }
 
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #6AA6CF 0%, #4A90C2 100%) !important;
+        background: linear-gradient(135deg, #6AA6CF, #4A90C2) !important;
         color: #FFFFFF !important;
         box-shadow: 0 2px 7px rgba(74, 144, 194, 0.20);
     }
@@ -170,21 +170,16 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     
     top_header_fill = PatternFill(start_color="4A90C2", end_color="4A90C2", fill_type="solid")
     top_header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-    
     sec_header_fill = PatternFill(start_color="E5F1F9", end_color="E5F1F9", fill_type="solid")
     sec_header_font = Font(name="Calibri", size=10, bold=True, color="285B7A")
-    
     index_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
     index_font = Font(name="Calibri", size=10, bold=True, color="000000")
-    
     total_fill = PatternFill(start_color="E9ECEF", end_color="E9ECEF", fill_type="solid")
     total_font = Font(name="Calibri", size=10, bold=True, color="000000")
-    
     data_font = Font(name="Calibri", size=10, color="000000")
     
     align_center = Alignment(horizontal="center", vertical="center", wrap_text=False)
     align_left = Alignment(horizontal="left", vertical="center", wrap_text=False)
-    
     thin_border = Border(
         left=Side(style='thin', color='BFBFBF'),
         right=Side(style='thin', color='BFBFBF'),
@@ -303,148 +298,6 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = openpyxl.utils.get_column_letter(col[0].column)
         ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
-
-    wb.save(buffer)
-    buffer.seek(0)
-    return buffer.getvalue()
-
-def convert_all_pivots_to_excel(pivot_dict):
-    buffer = io.BytesIO()
-    wb = openpyxl.Workbook()
-    wb.remove(wb.active)
-
-    top_header_fill = PatternFill(start_color="4A90C2", end_color="4A90C2", fill_type="solid")
-    top_header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-    sec_header_fill = PatternFill(start_color="E5F1F9", end_color="E5F1F9", fill_type="solid")
-    sec_header_font = Font(name="Calibri", size=10, bold=True, color="285B7A")
-    index_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-    index_font = Font(name="Calibri", size=10, bold=True, color="000000")
-    total_fill = PatternFill(start_color="E9ECEF", end_color="E9ECEF", fill_type="solid")
-    total_font = Font(name="Calibri", size=10, bold=True, color="000000")
-    data_font = Font(name="Calibri", size=10, color="000000")
-    
-    align_center = Alignment(horizontal="center", vertical="center", wrap_text=False)
-    align_left = Alignment(horizontal="left", vertical="center", wrap_text=False)
-    thin_border = Border(
-        left=Side(style='thin', color='BFBFBF'),
-        right=Side(style='thin', color='BFBFBF'),
-        top=Side(style='thin', color='BFBFBF'),
-        bottom=Side(style='thin', color='BFBFBF')
-    )
-
-    for sheet_name, pivot_df in pivot_dict.items():
-        if pivot_df is not None and not pivot_df.empty:
-            ws = wb.create_sheet(title=sheet_name[:31])
-
-            if isinstance(pivot_df.columns, pd.MultiIndex):
-                metrics = pivot_df.columns.get_level_values(1)
-                entity_title = pivot_df.index.name if pivot_df.index.name else ""
-
-                ws.cell(row=1, column=1, value="").fill = top_header_fill
-                ws.cell(row=1, column=1).border = thin_border
-                
-                current_col = 2
-                for month in pivot_df.columns.get_level_values(0).unique():
-                    sub_cols = [c for c in pivot_df.columns if c[0] == month]
-                    num_sub = len(sub_cols)
-                    if num_sub > 1:
-                        ws.merge_cells(start_row=1, start_column=current_col, end_row=1, end_column=current_col + num_sub - 1)
-                    cell = ws.cell(row=1, column=current_col, value=str(month))
-                    cell.fill = top_header_fill
-                    cell.font = top_header_font
-                    cell.alignment = align_center
-                    
-                    for c in range(current_col, current_col + num_sub):
-                        ws.cell(row=1, column=c).border = thin_border
-                        ws.cell(row=1, column=c).fill = top_header_fill
-                    current_col += num_sub
-
-                cell_a2 = ws.cell(row=2, column=1, value=str(entity_title))
-                cell_a2.fill = index_fill
-                cell_a2.font = index_font
-                cell_a2.alignment = align_center
-                cell_a2.border = thin_border
-
-                for col_idx, metric in enumerate(metrics, start=2):
-                    cell = ws.cell(row=2, column=col_idx, value=str(metric))
-                    cell.fill = sec_header_fill
-                    cell.font = sec_header_font
-                    cell.alignment = align_center
-                    cell.border = thin_border
-
-                for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=3):
-                    is_grand_total = (str(idx_val).strip().lower() == 'grand total')
-                    
-                    idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
-                    idx_cell.fill = total_fill if is_grand_total else index_fill
-                    idx_cell.font = total_font if is_grand_total else index_font
-                    idx_cell.alignment = align_left
-                    idx_cell.border = thin_border
-
-                    for c_idx, (m_col, val) in enumerate(zip(metrics, row_data), start=2):
-                        val_cell = ws.cell(row=r_idx, column=c_idx)
-                        val_cell.font = total_font if is_grand_total else data_font
-                        if is_grand_total:
-                            val_cell.fill = total_fill
-                        val_cell.alignment = align_center
-                        val_cell.border = thin_border
-
-                        if isinstance(val, (int, float, np.number)):
-                            if str(m_col).upper() in ['ACOS', 'TACOS']:
-                                val_cell.value = val / 100.0 if val > 1 else val
-                                val_cell.number_format = '0.00%'
-                            else:
-                                val_cell.value = round(val, 2)
-                                val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
-                        else:
-                            val_cell.value = val
-            else:
-                for col_idx, col_name in enumerate(pivot_df.columns, start=1):
-                    cell = ws.cell(row=1, column=col_idx, value=str(col_name))
-                    cell.fill = top_header_fill
-                    cell.font = top_header_font
-                    cell.alignment = align_center
-                    cell.border = thin_border
-
-                for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=2):
-                    is_pct_row = (str(row_data.iloc[0]).strip().lower() == 'percentage %')
-                    for c_idx, (col_name, val) in enumerate(zip(pivot_df.columns, row_data), start=1):
-                        val_cell = ws.cell(row=r_idx, column=c_idx)
-                        val_cell.font = total_font if is_pct_row else data_font
-                        val_cell.alignment = align_center
-                        val_cell.border = thin_border
-                        
-                        if str(col_name).upper() in ['ACOS', 'TACOS'] and not is_pct_row and isinstance(val, (int, float, np.number)):
-                            val_cell.value = val / 100.0 if val > 1 else val
-                            val_cell.number_format = '0.00%'
-                        elif isinstance(val, float):
-                            val_cell.value = round(val, 2)
-                            val_cell.number_format = '#,##0.00'
-                        elif isinstance(val, (int, np.integer)):
-                            val_cell.value = val
-                            val_cell.number_format = '#,##0'
-                        else:
-                            val_cell.value = val
-
-                        if is_pct_row and c_idx > 1:
-                            val_str = str(val).replace('%', '').replace('+', '').strip()
-                            try:
-                                num_v = float(val_str)
-                                if num_v < 0:
-                                    val_cell.fill = PatternFill(start_color="F8D7DA", end_color="F8D7DA", fill_type="solid")
-                                    val_cell.font = Font(name="Calibri", size=10, bold=True, color="721C24")
-                                elif num_v > 0:
-                                    val_cell.fill = PatternFill(start_color="D4EDDA", end_color="D4EDDA", fill_type="solid")
-                                    val_cell.font = Font(name="Calibri", size=10, bold=True, color="155724")
-                            except ValueError:
-                                pass
-                        elif is_pct_row:
-                            val_cell.fill = sec_header_fill
-
-            for col in ws.columns:
-                max_len = max(len(str(cell.value or '')) for cell in col)
-                col_letter = openpyxl.utils.get_column_letter(col[0].column)
-                ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
 
     wb.save(buffer)
     buffer.seek(0)
@@ -797,13 +650,8 @@ if uploaded_files:
             )
 
             metrics_order = ['Impressions', 'CPM', 'ATC', 'Orders', 'Spends', 'Sales', 'ROAS', 'ACOS']
-            is_weekly = (entity_col == 'Week')
-            all_months_asc = get_calendar_months_asc(working_df) if not is_weekly else sorted(working_df['Month'].dropna().unique())
-            
-            if is_weekly:
-                all_months_sorted = sorted(working_df['Month'].dropna().unique(), key=lambda w: int(''.join(filter(str.isdigit, str(w))) or 99))
-            else:
-                all_months_sorted = sorted(all_months_asc, key=lambda x: MONTH_ORDER_ASC.get(str(x).strip().upper(), 99), reverse=False)
+            all_months_asc = get_calendar_months_asc(working_df)
+            all_months_sorted = sorted(all_months_asc, key=lambda x: MONTH_ORDER_ASC.get(str(x).strip().upper(), 99), reverse=False)
             
             pivot_df = pivot_df.reorder_levels([1, 0], axis=1)
             sorted_cols = pd.MultiIndex.from_product([all_months_sorted, metrics_order], names=['Month', 'Metric'])
@@ -832,7 +680,7 @@ if uploaded_files:
                 grand_total_series[(month, 'ACOS')] = round((total_spends / total_sales) * 100, 2) if total_sales > 0 else 0.0
 
             pivot_df.loc['Grand Total'] = grand_total_series
-            pivot_df.index.name = entity_col
+            pivot_df.index.name = entity_col.upper()
             return pivot_df
 
         def create_weekly_comparison_table_with_sales(df_input, selected_months=None):
@@ -851,8 +699,15 @@ if uploaded_files:
                 spends = round(w_df['_budget_consumed'].sum(), 2)
                 sales = round(w_df['_sales'].sum(), 2)
                 orders = int(w_df['_orders'].sum())
+                ad_roas = round(sales / spends, 2) if spends > 0 else 0.0
                 
-                row_data = {'Week': w, 'Spends': spends, 'Ad Sales': sales, 'Ad Orders': orders}
+                row_data = {
+                    'Week': w,
+                    'Spends': spends,
+                    'Ad Sales': sales,
+                    'Ad ROAS': ad_roas,
+                    'Ad Orders': orders
+                }
                 
                 if has_sales:
                     w_dates = w_df['Date'].dropna().unique()
@@ -948,7 +803,12 @@ if uploaded_files:
             if df_to_show is None or df_to_show.empty:
                 return
             display_df = format_dashboard_dataframe(df_to_show)
-            st.dataframe(display_df, use_container_width=True, hide_index=True, key=f"{key_prefix}_grid")
+            st.dataframe(
+                display_df,
+                use_container_width=True,
+                hide_index=False if (isinstance(df_to_show.index, pd.Index) and df_to_show.index.name) else True,
+                key=f"{key_prefix}_grid"
+            )
 
         st.markdown("### 🔍 Global Dashboard Filters")
         available_months_asc = get_calendar_months_asc(final_df)
@@ -958,24 +818,37 @@ if uploaded_files:
         if selected_month != "All Months":
             filtered_df = filtered_df[filtered_df['Month'] == selected_month]
 
-        total_impressions = filtered_df['_impressions'].sum()
-        total_sales = round(filtered_df['_sales'].sum(), 2)
-        total_orders = filtered_df['_orders'].sum()
-        total_atc = filtered_df['_atc'].sum()
-        total_budget = round(filtered_df['_budget_consumed'].sum(), 2)
-        overall_roas = round((total_sales / total_budget), 2) if total_budget > 0 else 0.0
+        total_ad_sales = round(filtered_df['_sales'].sum(), 2)
+        total_ad_spends = round(filtered_df['_budget_consumed'].sum(), 2)
+        overall_ad_roas = round(total_ad_sales / total_ad_spends, 2) if total_ad_spends > 0 else 0.0
+
+        if not master_sales_df.empty and '_sales_dt' in master_sales_df.columns:
+            f_sales_df = master_sales_df if selected_month == "All Months" else master_sales_df[master_sales_df['Month'] == selected_month]
+            total_overall_sales = round(f_sales_df['_gross_amt'].sum(), 2)
+            total_overall_orders = len(f_sales_df)
+        else:
+            total_overall_sales = total_ad_sales
+            total_overall_orders = int(filtered_df['_orders'].sum())
+
+        overall_tacos = round((total_ad_spends / total_overall_sales) * 100, 2) if total_overall_sales > 0 else 0.0
+        overall_troas = round(total_overall_sales / total_ad_spends, 2) if total_ad_spends > 0 else 0.0
 
         st.markdown("### 📈 Overall Campaign Performance Dashboard")
-        r1, r2, r3 = st.columns(3)
-        with r1: st.metric("Total Impressions", f"{int(total_impressions):,}")
-        with r2: st.metric("Total Sales", f"₹{total_sales:,.2f}")
-        with r3: st.metric("Total Budget Consumed", f"₹{total_budget:,.2f}")
+        
+        dcol1, dcol2, dcol3 = st.columns(3)
+        with dcol1: st.metric("Ad Sales", f"₹{total_ad_sales:,.2f}")
+        with dcol2: st.metric("Total Sales", f"₹{total_overall_sales:,.2f}")
+        with dcol3: st.metric("Ad ROAS", f"{overall_ad_roas:.2f}x")
+
+        dcol4, dcol5, dcol6 = st.columns(3)
+        with dcol4: st.metric("TACOS", f"{overall_tacos:.2f}%")
+        with dcol5: st.metric("TROAS", f"{overall_troas:.2f}")
+        with dcol6: st.metric("Total Orders", f"{int(total_overall_orders):,}")
 
         st.divider()
 
         st.markdown("### 📑 Navigation & Performance Breakdown")
         
-        # RESTORED ALL 8 ORIGINAL MAIN TABS + DAILY TRACKER
         main_tab1, main_tab2, main_tab3, main_tab4, main_tab5, main_tab6, main_tab7, main_tab8, main_tab9 = st.tabs([
             "📄 Raw Files Preview",
             "📌 Consolidated Master",
