@@ -172,48 +172,6 @@ st.markdown("""
 
 st.write("Upload up to 5 monthly Ad Campaign spreadsheets and up to 5 Sales Reports (.xlsx, .xls) to analyze TACOS, TROAS, Overall Sales, Orders, and multi-metric trends.")
 
-# Top-level helper function for grouped tables
-def compute_grouped_table(df_subset, group_col, selected_item="All", search_query=""):
-    if df_subset is None or df_subset.empty or group_col not in df_subset.columns:
-        return pd.DataFrame()
-    
-    df_working = df_subset.dropna(subset=[group_col]).copy()
-    df_working[group_col] = df_working[group_col].astype(str)
-    
-    if selected_item and selected_item != "All":
-        df_working = df_working[df_working[group_col] == selected_item]
-
-    if search_query and search_query.strip():
-        df_working = df_working[df_working[group_col].str.contains(search_query.strip(), case=False, na=False)]
-    
-    if df_working.empty:
-        return pd.DataFrame()
-
-    grouped = df_working.groupby(group_col).agg(
-        IMPRESSIONS=('_impressions', 'sum'),
-        ATC=('_atc', 'sum'),
-        ORDERS=('_orders', 'sum'),
-        SPENDS=('_budget_consumed', 'sum'),
-        SALES=('_sales', 'sum')
-    ).reset_index()
-
-    grouped['CPM'] = grouped.apply(lambda r: round((r['SPENDS'] / r['IMPRESSIONS']) * 1000, 2) if r['IMPRESSIONS'] > 0 else 0.0, axis=1)
-    grouped['ROAS'] = grouped.apply(lambda r: round(r['SALES'] / r['SPENDS'], 2) if r['SPENDS'] > 0 else 0.0, axis=1)
-    grouped['ACOS'] = grouped.apply(lambda r: round((r['SPENDS'] / r['SALES']) * 100, 2) if r['SALES'] > 0 else 0.0, axis=1)
-
-    display_name = group_col.upper()
-    if group_col == 'Campaign Name': display_name = 'CAMPAIGN NAME'
-    elif group_col == 'Ad Type Combined': display_name = 'MATCH / AD TYPE'
-
-    grouped = grouped.rename(columns={group_col: display_name})
-    grouped = grouped.sort_values(by='SPENDS', ascending=False).reset_index(drop=True)
-
-    col_order = [display_name, 'IMPRESSIONS', 'CPM', 'ATC', 'ORDERS', 'SPENDS', 'SALES', 'ROAS', 'ACOS']
-    res_df = grouped.reindex(columns=col_order)
-    res_df['SPENDS'] = res_df['SPENDS'].round(2)
-    res_df['SALES'] = res_df['SALES'].round(2)
-    return res_df
-
 def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     buffer = io.BytesIO()
     wb = openpyxl.Workbook()
@@ -861,7 +819,6 @@ if uploaded_files:
 
             res_df = pd.DataFrame(rows)
             if not res_df.empty:
-                # DYNAMIC AGGREGATE / AVERAGE SUMMARY ROW FOR WEEKLY TABLE
                 n_weeks = len(weeks_list)
                 tot_imp = res_df['Impressions'].sum()
                 avg_cpm = round(res_df['CPM'].mean(), 2)
@@ -1047,17 +1004,13 @@ if uploaded_files:
 
         st.markdown("### 📑 Navigation & Performance Breakdown")
         
-        main_tab1, main_tab2, main_tab3, main_tab4, main_tab5, main_tab6, main_tab7, main_tab8, main_tab9, main_tab10 = st.tabs([
+        # EXACTLY 5 TABS ENDING AT CITY LEVEL OV
+        main_tab1, main_tab2, main_tab3, main_tab4, main_tab5 = st.tabs([
             "📄 Raw Files Preview",
             "📌 Consolidated Master",
             "📊 Comparison Tables (MoM)",
             "📅 Daily Tracker",
-            "📍 City Level Ov",
-            "📈 Interactive Trend Analytics",
-            "🎯 Campaign Performance",
-            "📢 Ad Type Performance",
-            "🔎 Keyword Performance",
-            "📅 Weekly Trend"
+            "📍 City Level Ov"
         ])
 
         with main_tab1:
@@ -1195,7 +1148,6 @@ if uploaded_files:
         with main_tab5:
             st.subheader("📍 City Level Overview & Product Performance")
             if not master_sales_df.empty:
-                # MONTH FILTER ABOVE STATE/CITY FILTERS
                 sales_months_avail = ["All Months"] + sorted(master_sales_df['Month'].dropna().unique().tolist(), key=lambda x: MONTH_ORDER_ASC.get(str(x).strip().upper(), 99))
                 sel_city_month = st.selectbox("Select Month for City View:", sales_months_avail, key="city_month_filter")
 
@@ -1203,7 +1155,6 @@ if uploaded_files:
                 if sel_city_month != "All Months":
                     city_filtered_sales = city_filtered_sales[city_filtered_sales['Month'] == sel_city_month]
 
-                # STATE DROPDOWN WITH SALES & ORDERS METRICS DISPLAYED ALONGSIDE
                 state_agg = city_filtered_sales.groupby('Supply State').agg(
                     Total_Sales=('_gross_amt', 'sum'),
                     Total_Orders=('Supply State', 'count')
@@ -1283,44 +1234,6 @@ if uploaded_files:
                     st.info("Required product/sales columns not found in sales report.")
             else:
                 st.info("Please upload a Sales Report to view City Level Overview.")
-
-        with main_tab6:
-            st.subheader("📈 Interactive Multi-Metric Trend Analytics")
-            all_df_months = get_calendar_months_asc(final_df)
-            selected_trend_months = st.multiselect("Select Months:", options=all_df_months, default=all_df_months, key="trend_m_sel")
-            if selected_trend_months:
-                trend_df = final_df[final_df['Month'].isin(selected_trend_months)].copy()
-                monthly_summary = trend_df.groupby('Month').agg(
-                    _impressions=('_impressions', 'sum'),
-                    _sales=('_sales', 'sum'),
-                    _budget_consumed=('_budget_consumed', 'sum')
-                ).reset_index()
-                st.dataframe(format_dashboard_dataframe(monthly_summary), use_container_width=True, hide_index=True)
-
-        with main_tab7:
-            if 'Campaign Name' in filtered_df.columns:
-                st.markdown("#### 🎯 Campaign Performance")
-                camp_df = compute_grouped_table(filtered_df, 'Campaign Name', "All")
-                st.dataframe(format_dashboard_dataframe(camp_df), use_container_width=True, hide_index=True)
-
-        with main_tab8:
-            if 'Ad Type Combined' in filtered_df.columns:
-                st.markdown("#### 📢 Ad Type Performance")
-                ad_df = compute_grouped_table(filtered_df, 'Ad Type Combined', "All")
-                st.dataframe(format_dashboard_dataframe(ad_df), use_container_width=True, hide_index=True)
-
-        with main_tab9:
-            kw_col = next((c for c in ['Search Term', 'Keyword', 'Targeting Value'] if c in final_df.columns), None)
-            if kw_col:
-                st.markdown("#### 🔎 Keyword Performance")
-                kw_df = compute_grouped_table(filtered_df, kw_col, "All")
-                st.dataframe(format_dashboard_dataframe(kw_df), use_container_width=True, hide_index=True)
-
-        with main_tab10:
-            if 'Week' in filtered_df.columns and filtered_df['Week'].notna().any():
-                st.markdown("#### 📅 Weekly Trend")
-                wk_df = compute_grouped_table(filtered_df, 'Week', "All")
-                st.dataframe(format_dashboard_dataframe(wk_df), use_container_width=True, hide_index=True)
 
         st.markdown("---")
         st.subheader("💾 Download Consolidated Master Workbook")
