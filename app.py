@@ -742,18 +742,34 @@ if uploaded_files:
                 ov_orders = len(day_sales)
                 
                 day_spends = 0.0
+                day_imp = 0.0
+                day_atc = 0.0
+                day_ad_sales = 0.0
+                day_ad_orders = 0.0
+
                 if not ad_df.empty and 'Date' in ad_df.columns:
                     matched_ad = ad_df[ad_df['_date_dt'].dt.day == day_i]
                     day_spends = round(matched_ad['_budget_consumed'].sum(), 2)
+                    day_imp = matched_ad['_impressions'].sum()
+                    day_atc = matched_ad['_atc'].sum()
+                    day_ad_sales = round(matched_ad['_sales'].sum(), 2)
+                    day_ad_orders = int(matched_ad['_orders'].sum())
 
+                cpm = round((day_spends / day_imp) * 1000, 2) if day_imp > 0 else 0.0
+                roas = round(day_ad_sales / day_spends, 2) if day_spends > 0 else 0.0
                 tacos = round((day_spends / ov_sales) * 100, 2) if ov_sales > 0 else 0.0
                 troas = round(ov_sales / day_spends, 2) if day_spends > 0 else 0.0
 
                 rows.append({
                     'Date (Day)': f"Day {day_i}",
+                    'CPM': cpm,
+                    'Spends': day_spends,
+                    'Ad Sales': day_ad_sales,
                     'Total Sales': ov_sales,
+                    'ROAS': roas,
+                    'Ad Orders': day_ad_orders,
                     'Total Orders': ov_orders,
-                    'Total Spends': day_spends,
+                    'ATC': int(day_atc),
                     'TACOS': f"{tacos:.2f}%",
                     'TROAS': troas
                 })
@@ -761,15 +777,25 @@ if uploaded_files:
             res_df = pd.DataFrame(rows)
             total_sales_sum = res_df['Total Sales'].sum()
             total_orders_sum = res_df['Total Orders'].sum()
-            total_spends_sum = res_df['Total Spends'].sum()
+            total_spends_sum = res_df['Spends'].sum()
+            total_ad_sales_sum = res_df['Ad Sales'].sum()
+            total_ad_orders_sum = res_df['Ad Orders'].sum()
+            total_atc_sum = res_df['ATC'].sum()
+            avg_cpm = round(res_df['CPM'].mean(), 2)
+            avg_roas = round(total_ad_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
             avg_tacos = round((total_spends_sum / total_sales_sum) * 100, 2) if total_sales_sum > 0 else 0.0
             avg_troas = round(total_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
 
             summary_row = pd.DataFrame([{
                 'Date (Day)': 'Aggregate / Average',
+                'CPM': avg_cpm,
+                'Spends': total_spends_sum,
+                'Ad Sales': total_ad_sales_sum,
                 'Total Sales': total_sales_sum,
+                'ROAS': avg_roas,
+                'Ad Orders': total_ad_orders_sum,
                 'Total Orders': total_orders_sum,
-                'Total Spends': total_spends_sum,
+                'ATC': int(total_atc_sum),
                 'TACOS': f"{avg_tacos:.2f}%",
                 'TROAS': avg_troas
             }])
@@ -849,11 +875,12 @@ if uploaded_files:
 
         st.markdown("### 📑 Navigation & Performance Breakdown")
         
-        main_tab1, main_tab2, main_tab3, main_tab4, main_tab5, main_tab6, main_tab7, main_tab8, main_tab9 = st.tabs([
+        main_tab1, main_tab2, main_tab3, main_tab4, main_tab5, main_tab6, main_tab7, main_tab8, main_tab9, main_tab10 = st.tabs([
             "📄 Raw Files Preview",
             "📌 Consolidated Master",
             "📊 Comparison Tables (MoM)",
             "📅 Daily Tracker",
+            "📍 City Level Ov",
             "📈 Interactive Trend Analytics",
             "🎯 Campaign Performance",
             "📢 Ad Type Performance",
@@ -939,6 +966,43 @@ if uploaded_files:
                     st.info("No sales data available for the selected month.")
 
         with main_tab5:
+            st.subheader("📍 City Level Overview & Product Performance")
+            if not master_sales_df.empty:
+                states_list = ["All States"] + sorted([str(x) for x in master_sales_df['Supply State'].dropna().unique()]) if 'Supply State' in master_sales_df.columns else ["All States"]
+                sel_state = st.selectbox("Select Supply State:", states_list)
+
+                city_filtered_sales = master_sales_df.copy()
+                if sel_state != "All States" and 'Supply State' in master_sales_df.columns:
+                    city_filtered_sales = city_filtered_sales[city_filtered_sales['Supply State'] == sel_state]
+
+                cities_list = ["All Cities"] + sorted([str(x) for x in city_filtered_sales['Supply City'].dropna().unique()]) if 'Supply City' in city_filtered_sales.columns else ["All Cities"]
+                sel_city = st.selectbox("Select Supply City:", cities_list)
+
+                if sel_city != "All Cities" and 'Supply City' in city_filtered_sales.columns:
+                    city_filtered_sales = city_filtered_sales[city_filtered_sales['Supply City'] == sel_city]
+
+                prod_col = next((c for c in ['Product Name', 'Item Name', 'Product'] if c in city_filtered_sales.columns), None)
+                qty_col = next((c for c in ['Quantity', 'Qty', 'Units'] if c in city_filtered_sales.columns), None)
+                amt_col = next((c for c in ['Total Gross Bill Amount', 'Gross Amount', 'Selling Price (Rs)'] if c in city_filtered_sales.columns), None)
+
+                if prod_col and qty_col and amt_col:
+                    prod_agg = city_filtered_sales.groupby(prod_col).agg(
+                        Units_Sold=(qty_col, 'sum'),
+                        Total_Sales=(amt_col, 'sum')
+                    ).reset_index().sort_values(by='Total_Sales', ascending=False)
+
+                    prod_agg = prod_agg.rename(columns={
+                        prod_col: 'PRODUCT NAME',
+                        'Units_Sold': 'UNITS SOLD',
+                        'Total_Sales': 'TOTAL SALES AMOUNT (₹)'
+                    })
+                    st.dataframe(format_dashboard_dataframe(prod_agg), use_container_width=True, hide_index=True)
+                else:
+                    st.info("Required product/sales columns not found in sales report.")
+            else:
+                st.info("Please upload a Sales Report to view City Level Overview.")
+
+        with main_tab6:
             st.subheader("📈 Interactive Multi-Metric Trend Analytics")
             all_df_months = get_calendar_months_asc(final_df)
             selected_trend_months = st.multiselect("Select Months:", options=all_df_months, default=all_df_months, key="trend_m_sel")
@@ -951,26 +1015,26 @@ if uploaded_files:
                 ).reset_index()
                 st.dataframe(format_dashboard_dataframe(monthly_summary), use_container_width=True, hide_index=True)
 
-        with main_tab6:
+        with main_tab7:
             if 'Campaign Name' in filtered_df.columns:
                 st.markdown("#### 🎯 Campaign Performance")
                 camp_df = compute_grouped_table(filtered_df, 'Campaign Name', "All")
                 st.dataframe(format_dashboard_dataframe(camp_df), use_container_width=True, hide_index=True)
 
-        with main_tab7:
+        with main_tab8:
             if 'Ad Type Combined' in filtered_df.columns:
                 st.markdown("#### 📢 Ad Type Performance")
                 ad_df = compute_grouped_table(filtered_df, 'Ad Type Combined', "All")
                 st.dataframe(format_dashboard_dataframe(ad_df), use_container_width=True, hide_index=True)
 
-        with main_tab8:
+        with main_tab9:
             kw_col = next((c for c in ['Search Term', 'Keyword', 'Targeting Value'] if c in final_df.columns), None)
             if kw_col:
                 st.markdown("#### 🔎 Keyword Performance")
                 kw_df = compute_grouped_table(filtered_df, kw_col, "All")
                 st.dataframe(format_dashboard_dataframe(kw_df), use_container_width=True, hide_index=True)
 
-        with main_tab9:
+        with main_tab10:
             if 'Week' in filtered_df.columns and filtered_df['Week'].notna().any():
                 st.markdown("#### 📅 Weekly Trend")
                 wk_df = compute_grouped_table(filtered_df, 'Week', "All")
