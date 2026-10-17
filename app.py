@@ -707,6 +707,91 @@ if uploaded_files:
 
             return pd.DataFrame(rows_list)
 
+        def create_monthly_summary_daywise_table(selected_month):
+            if master_sales_df.empty or '_sales_dt' not in master_sales_df.columns:
+                return pd.DataFrame()
+
+            m_df = master_sales_df[master_sales_df['Month'] == selected_month].copy()
+            if m_df.empty:
+                return pd.DataFrame()
+
+            ad_df = final_df[final_df['Month'] == selected_month].copy() if 'Month' in final_df.columns else pd.DataFrame()
+            has_sales = True
+
+            rows = []
+            for day_i in range(1, 32):
+                day_sales = m_df[m_df['Day'] == day_i]
+                ov_sales = round(day_sales['_gross_amt'].sum(), 2)
+                ov_orders = len(day_sales)
+                
+                day_spends = 0.0
+                day_imp = 0.0
+                day_atc = 0.0
+                day_ad_sales = 0.0
+                day_ad_orders = 0.0
+
+                if not ad_df.empty and 'Date' in ad_df.columns:
+                    matched_ad = ad_df[ad_df['_date_dt'].dt.day == day_i]
+                    day_spends = round(matched_ad['_budget_consumed'].sum(), 2)
+                    day_imp = matched_ad['_impressions'].sum()
+                    day_atc = matched_ad['_atc'].sum()
+                    day_ad_sales = round(matched_ad['_sales'].sum(), 2)
+                    day_ad_orders = int(matched_ad['_orders'].sum())
+
+                cpm = round((day_spends / day_imp) * 1000, 2) if day_imp > 0 else 0.0
+                roas = round(day_ad_sales / day_spends, 2) if day_spends > 0 else 0.0
+                acos = round((day_spends / day_ad_sales) * 100, 2) if day_ad_sales > 0 else 0.0
+                tacos = round((day_spends / ov_sales) * 100, 2) if ov_sales > 0 else 0.0
+                troas = round(ov_sales / day_spends, 2) if day_spends > 0 else 0.0
+
+                rows.append({
+                    'Month': f"Day {day_i}",
+                    'Impressions': int(day_imp),
+                    'CPM': cpm,
+                    'ATC': int(day_atc),
+                    'Spends': day_spends,
+                    'Ad Sales': day_ad_sales,
+                    'Overall Sales': ov_sales,
+                    'Ad ROAS': roas,
+                    'TROAS': troas,
+                    'Ad Orders': day_ad_orders,
+                    'Overall Orders': ov_orders,
+                    'TACOS': f"{tacos:.2f}%",
+                    'ACOS': f"{acos:.2f}%"
+                })
+
+            res_df = pd.DataFrame(rows)
+            total_sales_sum = res_df['Overall Sales'].sum()
+            total_orders_sum = res_df['Overall Orders'].sum()
+            total_spends_sum = res_df['Spends'].sum()
+            total_ad_sales_sum = res_df['Ad Sales'].sum()
+            total_ad_orders_sum = res_df['Ad Orders'].sum()
+            total_atc_sum = res_df['ATC'].sum()
+            total_imp_sum = res_df['Impressions'].sum()
+            avg_cpm = round(res_df['CPM'].mean(), 2)
+            avg_roas = round(total_ad_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
+            avg_troas = round(total_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
+            avg_tacos = round((total_spends_sum / total_sales_sum) * 100, 2) if total_sales_sum > 0 else 0.0
+            avg_acos = round((total_spends_sum / total_ad_sales_sum) * 100, 2) if total_ad_sales_sum > 0 else 0.0
+
+            summary_row = pd.DataFrame([{
+                'Month': 'Aggregate / Average',
+                'Impressions': total_imp_sum,
+                'CPM': avg_cpm,
+                'ATC': int(total_atc_sum),
+                'Spends': total_spends_sum,
+                'Ad Sales': total_ad_sales_sum,
+                'Overall Sales': total_sales_sum,
+                'Ad ROAS': avg_roas,
+                'TROAS': avg_troas,
+                'Ad Orders': total_ad_orders_sum,
+                'Overall Orders': total_orders_sum,
+                'TACOS': f"{avg_tacos:.2f}%",
+                'ACOS': f"{avg_acos:.2f}%"
+            }])
+            res_df = pd.concat([res_df, summary_row], ignore_index=True)
+            return res_df
+
         def create_mom_comparison_table(df_input, entity_col, selected_months=None):
             if entity_col not in df_input.columns:
                 return pd.DataFrame()
@@ -1079,15 +1164,24 @@ if uploaded_files:
             ])
 
             with comp_sub_tab0:
-                st.markdown("#### Monthly Summary Table (with Sales, Orders, TACOS, TROAS)")
-                monthly_summary_df = create_monthly_summary_table(final_df)
+                st.markdown("#### Monthly Summary Table")
+                ms_filter_options = ["All Months"] + available_months_asc
+                selected_ms_month = st.selectbox("Select Month for Monthly Summary (Expands Day-Wise 1-31):", ms_filter_options, key="ms_month_filter_sel")
+
+                if selected_ms_month == "All Months":
+                    monthly_summary_df = create_monthly_summary_table(final_df)
+                    sheet_label = "Monthly_Summary"
+                else:
+                    monthly_summary_df = create_monthly_summary_daywise_table(selected_ms_month)
+                    sheet_label = f"Monthly_Summary_{selected_ms_month}"
+
                 if not monthly_summary_df.empty:
                     render_unified_single_table(monthly_summary_df, key_prefix="monthly_summary_tab")
-                    excel_month_summary = style_and_export_pivot(monthly_summary_df, sheet_name="Monthly_Summary")
+                    excel_month_summary = style_and_export_pivot(monthly_summary_df, sheet_name=sheet_label)
                     st.download_button(
                         label="📥 Download Monthly Summary Table (.xlsx)",
                         data=excel_month_summary,
-                        file_name="Monthly_Summary_Report.xlsx",
+                        file_name=f"{sheet_label}_Report.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="btn_dl_month_summary"
                     )
@@ -1168,7 +1262,7 @@ if uploaded_files:
                     st.info("No sales data available for the selected month.")
 
         with main_tab5:
-            st.subheader("📍 City & State Level Overview & Product Performance")
+            st.subheader("📍 City Level Overview & Product Performance")
             if not master_sales_df.empty:
                 sales_months_avail = ["All Months"] + sorted(master_sales_df['Month'].dropna().unique().tolist(), key=lambda x: MONTH_ORDER_ASC.get(str(x).strip().upper(), 99))
                 sel_city_month = st.selectbox("Select Month for City View:", sales_months_avail, key="city_month_filter")
@@ -1185,7 +1279,6 @@ if uploaded_files:
                 all_states_total_sales = city_filtered_sales['_gross_amt'].sum()
                 all_states_total_orders = len(city_filtered_sales)
 
-                # PROFESSIONAL FORMATTING FOR STATE DROPDOWN
                 state_options = [f"🌐 All States  •  Sales: ₹{all_states_total_sales:,.2f}  •  Orders: {all_states_total_orders:,}"]
                 state_mapping = {state_options[0]: "All States"}
 
@@ -1211,7 +1304,6 @@ if uploaded_files:
                 all_cities_total_sales = city_filtered_sales['_gross_amt'].sum()
                 all_cities_total_orders = len(city_filtered_sales)
 
-                # PROFESSIONAL FORMATTING FOR CITY DROPDOWN
                 city_options = [f"🌐 All Cities  •  Sales: ₹{all_cities_total_sales:,.2f}  •  Orders: {all_cities_total_orders:,}"]
                 city_mapping = {city_options[0]: "All Cities"}
 
