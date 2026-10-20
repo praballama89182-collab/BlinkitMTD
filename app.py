@@ -174,7 +174,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.write("Upload up to 5 monthly Ad Campaign spreadsheets and up to 5 Sales Reports (.xlsx, .xls) to analyze TACOS, TROAS, Overall Sales, Orders, and multi-metric trends.")
+st.write("Upload up to 5 monthly Ad Campaign spreadsheets and up to 5 Sales Reports (.xlsx, .xls) to analyze TACOS, TROAS, Overall Sales, Spends, and multi-metric trends.")
 
 def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     buffer = io.BytesIO()
@@ -618,6 +618,9 @@ if uploaded_files:
         final_df['_sales'] = final_df['_direct_sales'] + final_df['_indirect_sales']
 
         final_df['_budget_consumed'] = get_numeric_col(final_df, ['Estimated Budget Consumed', 'Budget Consumed', 'Spend'])
+        
+        # Most Viewed Position support column
+        final_df['_most_viewed_position'] = get_numeric_col(final_df, ['Most Viewed Position', 'Viewed Position', 'Average Position', 'Position'])
 
         if match_col and match_col in final_df.columns:
             final_df['Ad Type Combined'] = final_df[match_col].fillna("Other").astype(str).str.title()
@@ -716,7 +719,6 @@ if uploaded_files:
                 return pd.DataFrame()
 
             ad_df = final_df[final_df['Month'] == selected_month].copy() if 'Month' in final_df.columns else pd.DataFrame()
-            has_sales = True
 
             rows = []
             for day_i in range(1, 32):
@@ -808,20 +810,22 @@ if uploaded_files:
                 ATC=('_atc', 'sum'),
                 Orders=('_orders', 'sum'),
                 Spends=('_budget_consumed', 'sum'),
-                Sales=('_sales', 'sum')
+                Sales=('_sales', 'sum'),
+                Most_Viewed_Position=('_most_viewed_position', 'mean')
             ).reset_index()
 
             grouped['CPM'] = grouped.apply(lambda r: round((r['Spends'] / r['Impressions']) * 1000, 2) if r['Impressions'] > 0 else 0.0, axis=1)
             grouped['ROAS'] = grouped.apply(lambda r: round(r['Sales'] / r['Spends'], 2) if r['Spends'] > 0 else 0.0, axis=1)
             grouped['ACOS'] = grouped.apply(lambda r: round((r['Spends'] / r['Sales']) * 100, 2) if r['Sales'] > 0 else 0.0, axis=1)
+            grouped['Most Viewed Position'] = grouped['Most_Viewed_Position'].fillna(0).round().astype(int)
 
             pivot_df = grouped.pivot(
                 index=entity_col,
                 columns='Month',
-                values=['Impressions', 'CPM', 'ATC', 'Orders', 'Spends', 'Sales', 'ROAS', 'ACOS']
+                values=['Impressions', 'CPM', 'ATC', 'Orders', 'Spends', 'Sales', 'ROAS', 'ACOS', 'Most Viewed Position']
             )
 
-            metrics_order = ['Impressions', 'CPM', 'ATC', 'Orders', 'Spends', 'Sales', 'ROAS', 'ACOS']
+            metrics_order = ['Impressions', 'CPM', 'ATC', 'Orders', 'Spends', 'Sales', 'ROAS', 'ACOS', 'Most Viewed Position']
             all_months_asc = get_calendar_months_asc(working_df)
             all_months_sorted = sorted(all_months_asc, key=lambda x: MONTH_ORDER_ASC.get(str(x).strip().upper(), 99), reverse=False)
             
@@ -841,6 +845,7 @@ if uploaded_files:
                 total_orders = month_df['_orders'].sum()
                 total_spends = month_df['_budget_consumed'].sum()
                 total_sales = month_df['_sales'].sum()
+                mean_pos = month_df['_most_viewed_position'].mean()
 
                 grand_total_series[(month, 'Impressions')] = total_imp
                 grand_total_series[(month, 'CPM')] = round((total_spends / total_imp) * 1000, 2) if total_imp > 0 else 0.0
@@ -850,6 +855,7 @@ if uploaded_files:
                 grand_total_series[(month, 'Sales')] = round(total_sales, 2)
                 grand_total_series[(month, 'ROAS')] = round(total_sales / total_spends, 2) if total_spends > 0 else 0.0
                 grand_total_series[(month, 'ACOS')] = round((total_spends / total_sales) * 100, 2) if total_sales > 0 else 0.0
+                grand_total_series[(month, 'Most Viewed Position')] = int(round(mean_pos)) if pd.notna(mean_pos) else 0
 
             pivot_df.loc['Grand Total'] = grand_total_series
             pivot_df.index.name = entity_col.upper()
@@ -1073,28 +1079,31 @@ if uploaded_files:
         total_ad_spends = round(filtered_df['_budget_consumed'].sum(), 2)
         overall_ad_roas = round(total_ad_sales / total_ad_spends, 2) if total_ad_spends > 0 else 0.0
 
-        if not master_sales_df.empty and '_sales_dt' in master_sales_df.columns:
-            f_sales_df = master_sales_df if selected_month == "All Months" else master_sales_df[master_sales_df['Month'] == selected_month]
-            total_overall_sales = round(f_sales_df['_gross_amt'].sum(), 2)
-            total_overall_orders = len(f_sales_df)
-        else:
-            total_overall_sales = total_ad_sales
-            total_overall_orders = int(filtered_df['_orders'].sum())
-
-        overall_tacos = round((total_ad_spends / total_overall_sales) * 100, 2) if total_overall_sales > 0 else 0.0
-        overall_troas = round(total_overall_sales / total_ad_spends, 2) if total_ad_spends > 0 else 0.0
+        has_sales_data = not master_sales_df.empty and '_sales_dt' in master_sales_df.columns
 
         st.markdown("### 📈 Overall Campaign Performance Dashboard")
         
-        dcol1, dcol2, dcol3 = st.columns(3)
-        with dcol1: st.metric("Ad Sales", f"₹{total_ad_sales:,.2f}")
-        with dcol2: st.metric("Total Sales", f"₹{total_overall_sales:,.2f}")
-        with dcol3: st.metric("Ad ROAS", f"{overall_ad_roas:.2f}x")
+        if has_sales_data:
+            f_sales_df = master_sales_df if selected_month == "All Months" else master_sales_df[master_sales_df['Month'] == selected_month]
+            total_overall_sales = round(f_sales_df['_gross_amt'].sum(), 2)
+            total_overall_orders = len(f_sales_df)
+            overall_tacos = round((total_ad_spends / total_overall_sales) * 100, 2) if total_overall_sales > 0 else 0.0
+            overall_troas = round(total_overall_sales / total_ad_spends, 2) if total_ad_spends > 0 else 0.0
 
-        dcol4, dcol5, dcol6 = st.columns(3)
-        with dcol4: st.metric("TACOS", f"{overall_tacos:.2f}%")
-        with dcol5: st.metric("TROAS", f"{overall_troas:.2f}")
-        with dcol6: st.metric("Total Orders", f"{int(total_overall_orders):,}")
+            dcol1, dcol2, dcol3 = st.columns(3)
+            with dcol1: st.metric("Ad Sales", f"₹{total_ad_sales:,.2f}")
+            with dcol2: st.metric("Total Sales", f"₹{total_overall_sales:,.2f}")
+            with dcol3: st.metric("Ad ROAS", f"{overall_ad_roas:.2f}x")
+
+            dcol4, dcol5, dcol6 = st.columns(3)
+            with dcol4: st.metric("TACOS", f"{overall_tacos:.2f}%")
+            with dcol5: st.metric("TROAS", f"{overall_troas:.2f}")
+            with dcol6: st.metric("Spends", f"₹{total_ad_spends:,.2f}")
+        else:
+            dcol1, dcol2, dcol3 = st.columns(3)
+            with dcol1: st.metric("Ad Sales", f"₹{total_ad_sales:,.2f}")
+            with dcol2: st.metric("Spends", f"₹{total_ad_spends:,.2f}")
+            with dcol3: st.metric("Ad ROAS", f"{overall_ad_roas:.2f}x")
 
         st.divider()
 
@@ -1125,7 +1134,7 @@ if uploaded_files:
 
         with main_tab2:
             st.caption("Preview the combined dataset across all uploaded files.")
-            preview_clean_df = final_df.drop(columns=['_impressions', '_direct_atc', '_indirect_atc', '_atc', '_direct_orders', '_indirect_orders', '_orders', '_direct_sales', '_indirect_sales', '_sales', '_budget_consumed', '_date_dt', 'Ad Type Combined'], errors='ignore')
+            preview_clean_df = final_df.drop(columns=['_impressions', '_direct_atc', '_indirect_atc', '_atc', '_direct_orders', '_indirect_orders', '_orders', '_direct_sales', '_indirect_sales', '_sales', '_budget_consumed', '_date_dt', '_most_viewed_position', 'Ad Type Combined'], errors='ignore')
             master_styled = format_dashboard_dataframe(preview_clean_df.head(100)).style.set_properties(**{
                 'text-align': 'center', 'vertical-align': 'middle'
             }).set_table_styles([
@@ -1216,18 +1225,64 @@ if uploaded_files:
 
             with comp_sub_tab3:
                 st.markdown("#### Keyword Comparison Table")
+                
+                # Dedicated filters for Keyword Comparison (Specific Months & Specific Date Range)
                 kw_col = next((c for c in ['Search Term', 'Keyword', 'Targeting Value'] if c in final_df.columns), None)
-                kw_pivot = create_mom_comparison_table(final_df, kw_col) if kw_col else None
-                if kw_pivot is not None and not kw_pivot.empty:
-                    render_unified_single_table(kw_pivot, key_prefix="kw_pivot_tab")
-                    excel_kw = style_and_export_pivot(kw_pivot, sheet_name="Keyword_MoM")
-                    st.download_button(
-                        label="📥 Download Keyword Comparison Table (.xlsx)",
-                        data=excel_kw,
-                        file_name="Keyword_MoM_Comparison_Report.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="btn_dl_kw_pivot"
-                    )
+                if kw_col:
+                    st.markdown("##### 🎛️ Keyword Comparison Custom Filters")
+                    kcol1, kcol2 = st.columns(2)
+                    
+                    with kcol1:
+                        selected_kw_months = st.multiselect(
+                            "Select Month(s) for Keyword Comparison:",
+                            options=available_months_asc,
+                            default=available_months_asc,
+                            key="kw_months_multi"
+                        )
+                    
+                    with kcol2:
+                        valid_dates_df = final_df.dropna(subset=['_date_dt'])
+                        if not valid_dates_df.empty:
+                            min_dt = valid_dates_df['_date_dt'].min().date()
+                            max_dt = valid_dates_df['_date_dt'].max().date()
+                            kw_date_range = st.date_input(
+                                "Select Date Range for Keyword Comparison:",
+                                value=(min_dt, max_dt),
+                                min_value=min_dt,
+                                max_value=max_dt,
+                                key="kw_date_rng"
+                            )
+                        else:
+                            kw_date_range = None
+
+                    # Apply Filters to create filtered dataframe for keyword comparison
+                    kw_filtered_df = final_df.copy()
+                    if selected_kw_months:
+                        kw_filtered_df = kw_filtered_df[kw_filtered_df['Month'].isin(selected_kw_months)]
+                    
+                    if kw_date_range and isinstance(kw_date_range, tuple) and len(kw_date_range) == 2:
+                        start_d, end_d = kw_date_range
+                        kw_filtered_df = kw_filtered_df[
+                            kw_filtered_df['_date_dt'].notna() &
+                            (kw_filtered_df['_date_dt'].dt.date >= start_d) &
+                            (kw_filtered_df['_date_dt'].dt.date <= end_d)
+                        ]
+
+                    kw_pivot = create_mom_comparison_table(kw_filtered_df, kw_col) if not kw_filtered_df.empty else None
+                    if kw_pivot is not None and not kw_pivot.empty:
+                        render_unified_single_table(kw_pivot, key_prefix="kw_pivot_tab")
+                        excel_kw = style_and_export_pivot(kw_pivot, sheet_name="Keyword_MoM")
+                        st.download_button(
+                            label="📥 Download Keyword Comparison Table (.xlsx)",
+                            data=excel_kw,
+                            file_name="Keyword_MoM_Comparison_Report.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key="btn_dl_kw_pivot"
+                        )
+                    else:
+                        st.info("No keyword data available for the selected filters.")
+                else:
+                    st.info("Keyword column not found in uploaded ad files.")
 
             with comp_sub_tab4:
                 st.markdown("#### Weekly Comparison Table")
@@ -1245,25 +1300,28 @@ if uploaded_files:
 
         with main_tab4:
             st.subheader("📅 Daily Tracker")
-            tracker_month = st.selectbox("Select Month for Daily Tracker:", available_months_asc, key="tracker_month_sel")
-            if tracker_month:
-                daily_df = create_daily_tracker_table(tracker_month)
-                if not daily_df.empty:
-                    render_unified_single_table(daily_df, key_prefix="daily_tracker_tab")
-                    excel_daily = style_and_export_pivot(daily_df, sheet_name="Daily_Tracker")
-                    st.download_button(
-                        label="📥 Download Daily Tracker Table (.xlsx)",
-                        data=excel_daily,
-                        file_name=f"Daily_Tracker_{tracker_month}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="btn_dl_daily_tracker"
-                    )
-                else:
-                    st.info("No sales data available for the selected month.")
+            if has_sales_data:
+                tracker_month = st.selectbox("Select Month for Daily Tracker:", available_months_asc, key="tracker_month_sel")
+                if tracker_month:
+                    daily_df = create_daily_tracker_table(tracker_month)
+                    if not daily_df.empty:
+                        render_unified_single_table(daily_df, key_prefix="daily_tracker_tab")
+                        excel_daily = style_and_export_pivot(daily_df, sheet_name="Daily_Tracker")
+                        st.download_button(
+                            label="📥 Download Daily Tracker Table (.xlsx)",
+                            data=excel_daily,
+                            file_name=f"Daily_Tracker_{tracker_month}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key="btn_dl_daily_tracker"
+                        )
+                    else:
+                        st.info("No sales data available for the selected month.")
+            else:
+                st.info("Please upload a Sales Report to view the Daily Tracker.")
 
         with main_tab5:
             st.subheader("📍 City Level Overview & Product Performance")
-            if not master_sales_df.empty:
+            if has_sales_data:
                 sales_months_avail = ["All Months"] + sorted(master_sales_df['Month'].dropna().unique().tolist(), key=lambda x: MONTH_ORDER_ASC.get(str(x).strip().upper(), 99))
                 sel_city_month = st.selectbox("Select Month for City View:", sales_months_avail, key="city_month_filter")
 
@@ -1418,7 +1476,7 @@ if uploaded_files:
                 clean_sheet_name = raw_tab_name[:31]
                 combined_raw_tab_df.to_excel(writer, sheet_name=clean_sheet_name, index=False)
             
-            master_export_df = final_df.drop(columns=['_impressions', '_direct_atc', '_indirect_atc', '_atc', '_direct_orders', '_indirect_orders', '_orders', '_direct_sales', '_indirect_sales', '_sales', '_budget_consumed', '_date_dt', 'Ad Type Combined'], errors='ignore')
+            master_export_df = final_df.drop(columns=['_impressions', '_direct_atc', '_indirect_atc', '_atc', '_direct_orders', '_indirect_orders', '_orders', '_direct_sales', '_indirect_sales', '_sales', '_budget_consumed', '_date_dt', '_most_viewed_position', 'Ad Type Combined'], errors='ignore')
             master_export_df.to_excel(writer, sheet_name='Consolidated_Master', index=False)
 
         buffer_multi.seek(0)
