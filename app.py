@@ -11,7 +11,7 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 
 st.set_page_config(
     page_title="Blinkit Ad Report & Sales Merger & Analytics",
-    page_icon="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iI2ZkZDA0MyIvPjx0ZXh0IHg9IjI1NiIgeT0iMzIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2x0IiBmb250LXNpemU9IjIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+PGZzcGFuIGZpbGw9IiMwMDAwMDAiPmJsaW5rPC9mc3Bhbj48ZnNwYW4gZmlsbD0iIzAwODEwNyI+aXQ8L2ZzcGFuPjwvdGV4dD48L3N2Zz4=",
+    page_icon="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iI2ZkZDA0MyIvPjx0ZXh0IHg9IjI1NiIgeT0iMzIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2x0IiBmb250LXNpemU9IjIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+PGZzcpanIGZpbGw9IiMwMDAwMDAiPmJsaW5rPC9mc3Bhbj48ZnNwYW4gZmlsbD0iIzAwODEwNyI+aXQ8L2ZzcBhbj48L3RleHQ+PC9zdmc+",
     layout="wide"
 )
 
@@ -1060,7 +1060,7 @@ if uploaded_files:
             if isinstance(value, (float, np.floating)) and np.isfinite(value):
                 if is_percentage:
                     return f"{value:.2f}%"
-                if col == 'SPENDS':
+                if col in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES']:
                     return f"{int(round(value)):,}"
                 if float(value).is_integer():
                     return f"{int(value):,}"
@@ -1115,7 +1115,7 @@ if uploaded_files:
             overall_troas = round(total_overall_sales / total_ad_spends, 2) if total_ad_spends > 0 else 0.0
 
             dcol1, dcol2, dcol3 = st.columns(3)
-            with dcol1: st.metric("Ad Sales", f"₹{total_ad_sales:,.2f}")
+            with dcol1: st.metric("Ad Sales", f"₹{int(round(total_ad_sales)):,}")
             with dcol2: st.metric("Total Sales", f"₹{int(round(total_overall_sales)):,}")
             with dcol3: st.metric("Ad ROAS", f"{overall_ad_roas:.2f}x")
 
@@ -1125,7 +1125,7 @@ if uploaded_files:
             with dcol6: st.metric("Spends", f"₹{int(round(total_ad_spends)):,}")
         else:
             dcol1, dcol2, dcol3 = st.columns(3)
-            with dcol1: st.metric("Ad Sales", f"₹{total_ad_sales:,.2f}")
+            with dcol1: st.metric("Ad Sales", f"₹{int(round(total_ad_sales)):,}")
             with dcol2: st.metric("Spends", f"₹{int(round(total_ad_spends)):,}")
             with dcol3: st.metric("Ad ROAS", f"{overall_ad_roas:.2f}x")
 
@@ -1275,7 +1275,7 @@ if uploaded_files:
                                 min_dt = valid_dates_df['_date_dt'].min().date()
                                 max_dt = valid_dates_df['_date_dt'].max().date()
                                 
-                                # Fully supports single date clicks as well as date ranges seamlessly using a list/tuple format
+                                # Fully supports single day clicks or full ranges seamlessly using a tuple/list format
                                 kw_date_selection = st.date_input(
                                     "Filter by Date (Single Day or Date Range):",
                                     value=[min_dt, max_dt],
@@ -1286,7 +1286,7 @@ if uploaded_files:
                             else:
                                 kw_date_selection = None
 
-                    # Apply Professional Filter Logic supporting single dates, custom date lists, or ranges
+                    # Apply Professional Filter Logic supporting single dates, custom lists, or date ranges
                     kw_filtered_df = final_df.copy()
                     if selected_kw_months:
                         kw_filtered_df = kw_filtered_df[kw_filtered_df['Month'].isin(selected_kw_months)]
@@ -1307,7 +1307,7 @@ if uploaded_files:
                                     (kw_filtered_df['_date_dt'].dt.date == single_d)
                                 ]
                         else:
-                            # Single date selected directly
+                            # Single date selected
                             single_d = kw_date_selection
                             kw_filtered_df = kw_filtered_df[
                                 kw_filtered_df['_date_dt'].notna() &
