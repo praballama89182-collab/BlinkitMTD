@@ -784,8 +784,6 @@ if uploaded_files:
                 'Spends': total_spends_sum,
                 'Ad Sales': total_ad_sales_sum,
                 'Overall Sales': total_sales_sum,
-                'Ad ROAS': avg_roas,
-                'TROAS': avg_troas,
                 'Ad Orders': total_ad_orders_sum,
                 'Overall Orders': total_orders_sum,
                 'TACOS': f"{avg_tacos:.2f}%",
@@ -1224,49 +1222,70 @@ if uploaded_files:
                     )
 
             with comp_sub_tab3:
-                st.markdown("#### Keyword Comparison Table")
+                st.markdown("#### Keyword Performance & Comparison")
                 
-                # Dedicated filters for Keyword Comparison (Specific Months & Specific Date Range)
                 kw_col = next((c for c in ['Search Term', 'Keyword', 'Targeting Value'] if c in final_df.columns), None)
                 if kw_col:
-                    st.markdown("##### 🎛️ Keyword Comparison Custom Filters")
-                    kcol1, kcol2 = st.columns(2)
-                    
-                    with kcol1:
-                        selected_kw_months = st.multiselect(
-                            "Select Month(s) for Keyword Comparison:",
-                            options=available_months_asc,
-                            default=available_months_asc,
-                            key="kw_months_multi"
-                        )
-                    
-                    with kcol2:
-                        valid_dates_df = final_df.dropna(subset=['_date_dt'])
-                        if not valid_dates_df.empty:
-                            min_dt = valid_dates_df['_date_dt'].min().date()
-                            max_dt = valid_dates_df['_date_dt'].max().date()
-                            kw_date_range = st.date_input(
-                                "Select Date Range for Keyword Comparison:",
-                                value=(min_dt, max_dt),
-                                min_value=min_dt,
-                                max_value=max_dt,
-                                key="kw_date_rng"
+                    with st.container():
+                        st.markdown("""
+                        <div style="background: linear-gradient(135deg, #F3EBFB 0%, #EEF6FC 100%); border: 1px solid #D5C6E8; border-radius: 14px; padding: 16px; margin-bottom: 20px;">
+                            <h4 style="margin-top: 0; color: #285B7A; font-size: 16px;">Advanced Filter Parameters</h4>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        kcol1, kcol2 = st.columns(2)
+                        
+                        with kcol1:
+                            selected_kw_months = st.multiselect(
+                                "Filter by Month(s):",
+                                options=available_months_asc,
+                                default=available_months_asc,
+                                key="kw_months_multi"
                             )
-                        else:
-                            kw_date_range = None
+                        
+                        with kcol2:
+                            valid_dates_df = final_df.dropna(subset=['_date_dt'])
+                            if not valid_dates_df.empty:
+                                min_dt = valid_dates_df['_date_dt'].min().date()
+                                max_dt = valid_dates_df['_date_dt'].max().date()
+                                
+                                # Supports single dates or date ranges flexibly
+                                kw_date_selection = st.date_input(
+                                    "Filter by Date (Single Date or Date Range):",
+                                    value=(min_dt, max_dt),
+                                    min_value=min_dt,
+                                    max_value=max_dt,
+                                    key="kw_date_flexible"
+                                )
+                            else:
+                                kw_date_selection = None
 
-                    # Apply Filters to create filtered dataframe for keyword comparison
+                    # Apply Professional Filter Logic supporting single dates and ranges
                     kw_filtered_df = final_df.copy()
                     if selected_kw_months:
                         kw_filtered_df = kw_filtered_df[kw_filtered_df['Month'].isin(selected_kw_months)]
                     
-                    if kw_date_range and isinstance(kw_date_range, tuple) and len(kw_date_range) == 2:
-                        start_d, end_d = kw_date_range
-                        kw_filtered_df = kw_filtered_df[
-                            kw_filtered_df['_date_dt'].notna() &
-                            (kw_filtered_df['_date_dt'].dt.date >= start_d) &
-                            (kw_filtered_df['_date_dt'].dt.date <= end_d)
-                        ]
+                    if kw_date_selection:
+                        if isinstance(kw_date_selection, tuple):
+                            if len(kw_date_selection) == 2:
+                                start_d, end_d = kw_date_selection
+                                kw_filtered_df = kw_filtered_df[
+                                    kw_filtered_df['_date_dt'].notna() &
+                                    (kw_filtered_df['_date_dt'].dt.date >= start_d) &
+                                    (kw_filtered_df['_date_dt'].dt.date <= end_d)
+                                ]
+                            elif len(kw_date_selection) == 1:
+                                single_d = kw_date_selection[0]
+                                kw_filtered_df = kw_filtered_df[
+                                    kw_filtered_df['_date_dt'].notna() &
+                                    (kw_filtered_df['_date_dt'].dt.date == single_d)
+                                ]
+                        else:
+                            single_d = kw_date_selection
+                            kw_filtered_df = kw_filtered_df[
+                                kw_filtered_df['_date_dt'].notna() &
+                                (kw_filtered_df['_date_dt'].dt.date == single_d)
+                            ]
 
                     kw_pivot = create_mom_comparison_table(kw_filtered_df, kw_col) if not kw_filtered_df.empty else None
                     if kw_pivot is not None and not kw_pivot.empty:
