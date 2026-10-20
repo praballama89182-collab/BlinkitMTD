@@ -41,6 +41,7 @@ st.markdown("""
     h1, h2, h3 {
         color: var(--dash-blue-dark) !important;
         font-weight: 700 !important;
+        text-align: center !important;
     }
 
     [data-testid="stMetric"] {
@@ -50,16 +51,25 @@ st.markdown("""
         border-radius: 14px;
         padding: 14px 18px;
         box-shadow: 0 3px 12px rgba(74, 144, 194, 0.10);
+        text-align: center !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
     [data-testid="stMetricLabel"] {
         color: #52708D !important;
         font-weight: 600 !important;
+        text-align: center !important;
+        display: flex;
+        justify-content: center;
     }
 
     [data-testid="stMetricValue"] {
         color: var(--dash-blue-dark) !important;
         font-weight: 750 !important;
+        text-align: center !important;
+        display: flex;
+        justify-content: center;
     }
 
     .stTabs [data-baseweb="tab-list"] {
@@ -68,6 +78,7 @@ st.markdown("""
         border: 1px solid var(--lavender-border);
         border-radius: 16px;
         padding: 6px;
+        justify-content: center;
     }
 
     .stTabs [data-baseweb="tab"] {
@@ -77,6 +88,7 @@ st.markdown("""
         font-weight: 600;
         background: #FFFFFF;
         border: 1px solid #E2D6F3;
+        text-align: center;
     }
 
     .stTabs [aria-selected="true"] {
@@ -163,7 +175,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("""
-<div style="display: flex; align-items: center; gap: 14px; margin-bottom: 5px;">
+<div style="display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 5px;">
     <svg width="48" height="48" viewBox="0 0 512 512" style="border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
         <rect width="512" height="512" rx="112" fill="#fdd043"/>
         <text x="256" y="320" font-family="Arial, sans-serif" font-weight="bold" font-size="210" text-anchor="middle">
@@ -174,7 +186,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.write("Upload up to 5 monthly Ad Campaign spreadsheets and up to 5 Sales Reports (.xlsx, .xls) to analyze TACOS, TROAS, Overall Sales, Spends, and multi-metric trends.")
+st.markdown("<p style='text-align: center;'>Upload up to 5 monthly Ad Campaign spreadsheets and up to 5 Sales Reports (.xlsx, .xls) to analyze TACOS, TROAS, Overall Sales, Spends, and multi-metric trends.</p>", unsafe_allow_html=True)
 
 def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     buffer = io.BytesIO()
@@ -258,6 +270,9 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                     if str(m_col).upper() in ['ACOS', 'TACOS']:
                         val_cell.value = val / 100.0 if val > 1 else val
                         val_cell.number_format = '0.00%'
+                    elif str(m_col).upper() == 'SPENDS':
+                        val_cell.value = int(round(val))
+                        val_cell.number_format = '#,##0'
                     else:
                         val_cell.value = round(val, 2)
                         val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
@@ -284,6 +299,9 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 if str(col_name).upper() in ['ACOS', 'TACOS'] and isinstance(val, (int, float, np.number)):
                     val_cell.value = val / 100.0 if val > 1 else val
                     val_cell.number_format = '0.00%'
+                elif str(col_name).upper() == 'SPENDS' and isinstance(val, (int, float, np.number)):
+                    val_cell.value = int(round(val))
+                    val_cell.number_format = '#,##0'
                 elif isinstance(val, (int, float, np.number)):
                     val_cell.value = round(val, 2)
                     val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
@@ -383,6 +401,9 @@ def convert_all_pivots_to_excel(pivot_dict):
                             if str(m_col).upper() in ['ACOS', 'TACOS']:
                                 val_cell.value = val / 100.0 if val > 1 else val
                                 val_cell.number_format = '0.00%'
+                            elif str(m_col).upper() == 'SPENDS':
+                                val_cell.value = int(round(val))
+                                val_cell.number_format = '#,##0'
                             else:
                                 val_cell.value = round(val, 2)
                                 val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
@@ -409,6 +430,9 @@ def convert_all_pivots_to_excel(pivot_dict):
                         if str(col_name).upper() in ['ACOS', 'TACOS'] and isinstance(val, (int, float, np.number)):
                             val_cell.value = val / 100.0 if val > 1 else val
                             val_cell.number_format = '0.00%'
+                        elif str(col_name).upper() == 'SPENDS' and isinstance(val, (int, float, np.number)):
+                            val_cell.value = int(round(val))
+                            val_cell.number_format = '#,##0'
                         elif isinstance(val, (int, float, np.number)):
                             val_cell.value = round(val, 2)
                             val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
@@ -1036,6 +1060,8 @@ if uploaded_files:
             if isinstance(value, (float, np.floating)) and np.isfinite(value):
                 if is_percentage:
                     return f"{value:.2f}%"
+                if col == 'SPENDS':
+                    return f"{int(round(value)):,}"
                 if float(value).is_integer():
                     return f"{int(value):,}"
                 return f"{value:,.2f}"
@@ -1096,11 +1122,11 @@ if uploaded_files:
             dcol4, dcol5, dcol6 = st.columns(3)
             with dcol4: st.metric("TACOS", f"{overall_tacos:.2f}%")
             with dcol5: st.metric("TROAS", f"{overall_troas:.2f}")
-            with dcol6: st.metric("Spends", f"₹{total_ad_spends:,.2f}")
+            with dcol6: st.metric("Spends", f"₹{int(round(total_ad_spends)):,}")
         else:
             dcol1, dcol2, dcol3 = st.columns(3)
             with dcol1: st.metric("Ad Sales", f"₹{total_ad_sales:,.2f}")
-            with dcol2: st.metric("Spends", f"₹{total_ad_spends:,.2f}")
+            with dcol2: st.metric("Spends", f"₹{int(round(total_ad_spends)):,}")
             with dcol3: st.metric("Ad ROAS", f"{overall_ad_roas:.2f}x")
 
         st.divider()
@@ -1229,7 +1255,7 @@ if uploaded_files:
                     with st.container():
                         st.markdown("""
                         <div style="background: linear-gradient(135deg, #F3EBFB 0%, #EEF6FC 100%); border: 1px solid #D5C6E8; border-radius: 14px; padding: 16px; margin-bottom: 20px;">
-                            <h4 style="margin-top: 0; color: #285B7A; font-size: 16px;">Advanced Filter Parameters</h4>
+                            <h4 style="margin-top: 0; color: #285B7A; font-size: 16px; text-align: center;">Advanced Filter Parameters</h4>
                         </div>
                         """, unsafe_allow_html=True)
                         
@@ -1249,9 +1275,9 @@ if uploaded_files:
                                 min_dt = valid_dates_df['_date_dt'].min().date()
                                 max_dt = valid_dates_df['_date_dt'].max().date()
                                 
-                                # Supports single dates or date ranges flexibly
+                                # Flexible date filter supporting single dates or date ranges seamlessly
                                 kw_date_selection = st.date_input(
-                                    "Filter by Date (Single Date or Date Range):",
+                                    "Filter by Date (Single Day or Date Range):",
                                     value=(min_dt, max_dt),
                                     min_value=min_dt,
                                     max_value=max_dt,
@@ -1260,13 +1286,13 @@ if uploaded_files:
                             else:
                                 kw_date_selection = None
 
-                    # Apply Professional Filter Logic supporting single dates and ranges
+                    # Apply Professional Filter Logic supporting single dates, custom dates, or date ranges
                     kw_filtered_df = final_df.copy()
                     if selected_kw_months:
                         kw_filtered_df = kw_filtered_df[kw_filtered_df['Month'].isin(selected_kw_months)]
                     
                     if kw_date_selection:
-                        if isinstance(kw_date_selection, tuple):
+                        if isinstance(kw_date_selection, (tuple, list)):
                             if len(kw_date_selection) == 2:
                                 start_d, end_d = kw_date_selection
                                 kw_filtered_df = kw_filtered_df[
@@ -1281,6 +1307,7 @@ if uploaded_files:
                                     (kw_filtered_df['_date_dt'].dt.date == single_d)
                                 ]
                         else:
+                            # Single date selected
                             single_d = kw_date_selection
                             kw_filtered_df = kw_filtered_df[
                                 kw_filtered_df['_date_dt'].notna() &
