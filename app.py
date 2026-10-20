@@ -270,7 +270,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                     if str(m_col).upper() in ['ACOS', 'TACOS']:
                         val_cell.value = val / 100.0 if val > 1 else val
                         val_cell.number_format = '0.00%'
-                    elif str(m_col).upper() == 'SPENDS':
+                    elif str(m_col).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES']:
                         val_cell.value = int(round(val))
                         val_cell.number_format = '#,##0'
                     else:
@@ -299,7 +299,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 if str(col_name).upper() in ['ACOS', 'TACOS'] and isinstance(val, (int, float, np.number)):
                     val_cell.value = val / 100.0 if val > 1 else val
                     val_cell.number_format = '0.00%'
-                elif str(col_name).upper() == 'SPENDS' and isinstance(val, (int, float, np.number)):
+                elif str(col_name).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES'] and isinstance(val, (int, float, np.number)):
                     val_cell.value = int(round(val))
                     val_cell.number_format = '#,##0'
                 elif isinstance(val, (int, float, np.number)):
@@ -401,7 +401,7 @@ def convert_all_pivots_to_excel(pivot_dict):
                             if str(m_col).upper() in ['ACOS', 'TACOS']:
                                 val_cell.value = val / 100.0 if val > 1 else val
                                 val_cell.number_format = '0.00%'
-                            elif str(m_col).upper() == 'SPENDS':
+                            elif str(m_col).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES']:
                                 val_cell.value = int(round(val))
                                 val_cell.number_format = '#,##0'
                             else:
@@ -430,7 +430,7 @@ def convert_all_pivots_to_excel(pivot_dict):
                         if str(col_name).upper() in ['ACOS', 'TACOS'] and isinstance(val, (int, float, np.number)):
                             val_cell.value = val / 100.0 if val > 1 else val
                             val_cell.number_format = '0.00%'
-                        elif str(col_name).upper() == 'SPENDS' and isinstance(val, (int, float, np.number)):
+                        elif str(col_name).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES'] and isinstance(val, (int, float, np.number)):
                             val_cell.value = int(round(val))
                             val_cell.number_format = '#,##0'
                         elif isinstance(val, (int, float, np.number)):
@@ -1116,7 +1116,7 @@ if uploaded_files:
 
             dcol1, dcol2, dcol3 = st.columns(3)
             with dcol1: st.metric("Ad Sales", f"₹{total_ad_sales:,.2f}")
-            with dcol2: st.metric("Total Sales", f"₹{total_overall_sales:,.2f}")
+            with dcol2: st.metric("Total Sales", f"₹{int(round(total_overall_sales)):,}")
             with dcol3: st.metric("Ad ROAS", f"{overall_ad_roas:.2f}x")
 
             dcol4, dcol5, dcol6 = st.columns(3)
@@ -1275,10 +1275,10 @@ if uploaded_files:
                                 min_dt = valid_dates_df['_date_dt'].min().date()
                                 max_dt = valid_dates_df['_date_dt'].max().date()
                                 
-                                # Flexible date filter supporting single dates or date ranges seamlessly
+                                # Fully supports single date clicks as well as date ranges seamlessly using a list/tuple format
                                 kw_date_selection = st.date_input(
                                     "Filter by Date (Single Day or Date Range):",
-                                    value=(min_dt, max_dt),
+                                    value=[min_dt, max_dt],
                                     min_value=min_dt,
                                     max_value=max_dt,
                                     key="kw_date_flexible"
@@ -1286,7 +1286,7 @@ if uploaded_files:
                             else:
                                 kw_date_selection = None
 
-                    # Apply Professional Filter Logic supporting single dates, custom dates, or date ranges
+                    # Apply Professional Filter Logic supporting single dates, custom date lists, or ranges
                     kw_filtered_df = final_df.copy()
                     if selected_kw_months:
                         kw_filtered_df = kw_filtered_df[kw_filtered_df['Month'].isin(selected_kw_months)]
@@ -1307,7 +1307,7 @@ if uploaded_files:
                                     (kw_filtered_df['_date_dt'].dt.date == single_d)
                                 ]
                         else:
-                            # Single date selected
+                            # Single date selected directly
                             single_d = kw_date_selection
                             kw_filtered_df = kw_filtered_df[
                                 kw_filtered_df['_date_dt'].notna() &
@@ -1383,14 +1383,14 @@ if uploaded_files:
                 all_states_total_sales = city_filtered_sales['_gross_amt'].sum()
                 all_states_total_orders = len(city_filtered_sales)
 
-                state_options = [f"🌐 All States  •  Sales: ₹{all_states_total_sales:,.2f}  •  Orders: {all_states_total_orders:,}"]
+                state_options = [f"🌐 All States  •  Sales: ₹{int(round(all_states_total_sales)):,}  •  Orders: {all_states_total_orders:,}"]
                 state_mapping = {state_options[0]: "All States"}
 
                 for _, row in state_agg.sort_values(by='Total_Sales', ascending=False).iterrows():
                     st_name = str(row['Supply State']).title()
                     st_sales = row['Total_Sales']
                     st_orders = int(row['Total_Orders'])
-                    display_label = f"📍 {st_name}  •  Sales: ₹{st_sales:,.2f}  •  Orders: {st_orders:,}"
+                    display_label = f"📍 {st_name}  •  Sales: ₹{int(round(st_sales)):,}  •  Orders: {st_orders:,}"
                     state_options.append(display_label)
                     state_mapping[display_label] = row['Supply State']
 
@@ -1408,14 +1408,14 @@ if uploaded_files:
                 all_cities_total_sales = city_filtered_sales['_gross_amt'].sum()
                 all_cities_total_orders = len(city_filtered_sales)
 
-                city_options = [f"🌐 All Cities  •  Sales: ₹{all_cities_total_sales:,.2f}  •  Orders: {all_cities_total_orders:,}"]
+                city_options = [f"🌐 All Cities  •  Sales: ₹{int(round(all_cities_total_sales)):,}  •  Orders: {all_cities_total_orders:,}"]
                 city_mapping = {city_options[0]: "All Cities"}
 
                 for _, row in city_agg.sort_values(by='Total_Sales', ascending=False).iterrows():
                     c_name = str(row['Supply City']).title()
                     c_sales = row['Total_Sales']
                     c_orders = int(row['Total_Orders'])
-                    display_label = f"🏙️ {c_name}  •  Sales: ₹{c_sales:,.2f}  •  Orders: {c_orders:,}"
+                    display_label = f"🏙️ {c_name}  •  Sales: ₹{int(round(c_sales)):,}  •  Orders: {c_orders:,}"
                     city_options.append(display_label)
                     city_mapping[display_label] = row['Supply City']
 
