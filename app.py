@@ -185,7 +185,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown("<p style='text-align: center;'>Upload up to 5 monthly Ad Campaign spreadsheets/CSV files and up to 5 Sales Reports (.xlsx, .xls) to analyze TACOS, TROAS, Overall Sales, Spends, and multi-metric trends.</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Upload up to 5 monthly Ad Campaign spreadsheets/CSV files and up to 5 Sales Reports (.csv, .xlsx, .xls) to analyze TACOS, TROAS, Overall Sales, Spends, and multi-metric trends.</p>", unsafe_allow_html=True)
 
 def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     buffer = io.BytesIO()
@@ -447,11 +447,17 @@ def convert_all_pivots_to_excel(pivot_dict):
     buffer.seek(0)
     return buffer.getvalue()
 
+def convert_dataframe_to_excel_download(df_to_export, sheet_name="Sheet1"):
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df_to_export.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+    buffer.seek(0)
+    return buffer.getvalue()
+
 st.markdown("### 📤 Upload Ad Campaign Reports (Up to 5)")
 col1, col2, col3, col4, col5 = st.columns(5)
 uploaded_files = []
 
-# Updated allowed types to accept CSV along with Excel formats (.xlsx, .xls, .xlsb, .xlsm)
 ad_file_types = ["csv", "xlsx", "xls", "xlsb", "xlsm"]
 
 with col1:
@@ -474,30 +480,36 @@ st.markdown("### 📥 Upload Sales Reports (Up to 5)")
 scol1, scol2, scol3, scol4, scol5 = st.columns(5)
 uploaded_sales_files = []
 
+sales_file_types = ["csv", "xlsx", "xls", "xlsb", "xlsm"]
+
 with scol1:
-    s1 = st.file_uploader("Upload Sales File 1", type=["xlsx", "xls"], key="sales1")
+    s1 = st.file_uploader("Upload Sales File 1", type=sales_file_types, key="sales1")
     if s1: uploaded_sales_files.append(s1)
 with scol2:
-    s2 = st.file_uploader("Upload Sales File 2", type=["xlsx", "xls"], key="sales2")
+    s2 = st.file_uploader("Upload Sales File 2", type=sales_file_types, key="sales2")
     if s2: uploaded_sales_files.append(s2)
 with scol3:
-    s3 = st.file_uploader("Upload Sales File 3", type=["xlsx", "xls"], key="sales3")
+    s3 = st.file_uploader("Upload Sales File 3", type=sales_file_types, key="sales3")
     if s3: uploaded_sales_files.append(s3)
 with scol4:
-    s4 = st.file_uploader("Upload Sales File 4", type=["xlsx", "xls"], key="sales4")
+    s4 = st.file_uploader("Upload Sales File 4", type=sales_file_types, key="sales4")
     if s4: uploaded_sales_files.append(s4)
 with scol5:
-    s5 = st.file_uploader("Upload Sales File 5", type=["xlsx", "xls"], key="sales5")
+    s5 = st.file_uploader("Upload Sales File 5", type=sales_file_types, key="sales5")
     if s5: uploaded_sales_files.append(s5)
 
 sales_dfs_list = []
 if uploaded_sales_files:
     for s_file in uploaded_sales_files:
         try:
-            s_xls = pd.ExcelFile(s_file)
-            for s_sheet in s_xls.sheet_names:
-                sdf = pd.read_excel(s_xls, sheet_name=s_sheet)
+            if s_file.name.lower().endswith('.csv'):
+                sdf = pd.read_csv(s_file)
                 sales_dfs_list.append(sdf)
+            else:
+                s_xls = pd.ExcelFile(s_file)
+                for s_sheet in s_xls.sheet_names:
+                    sdf = pd.read_excel(s_xls, sheet_name=s_sheet)
+                    sales_dfs_list.append(sdf)
         except Exception as e:
             st.error(f"Error reading sales file {s_file.name}: {str(e)}")
 
@@ -534,7 +546,6 @@ if uploaded_files:
         
         try:
             if file_name_lower.endswith('.csv'):
-                # Read CSV file directly into a single dataframe dictionary entry
                 df = pd.read_csv(uploaded_file)
                 sheet_name = "Sheet1"
                 raw_files_dict[uploaded_file.name][sheet_name] = df.copy()
@@ -574,7 +585,6 @@ if uploaded_files:
 
                 consolidated_dfs.append(df_consolidated)
             else:
-                # Read Excel file workbook tabs
                 xls = pd.ExcelFile(uploaded_file)
                 sheets_to_process = xls.sheet_names[1:] if len(xls.sheet_names) > 1 else xls.sheet_names
                 valid_sheet_names = [s for s in sheets_to_process if s.strip().lower() not in ['consolidated_master', 'summary', 'overall', 'ads dump', 'overall dump']]
@@ -693,8 +703,6 @@ if uploaded_files:
             final_df['Ad Type Combined'] = final_df[match_col].fillna("Other").astype(str).str.title()
         else:
             final_df['Ad Type Combined'] = "Other"
-
-        date_col = next((c for c in ['Date', 'date', 'Day', 'DATE', 'date_ist', 'timestamp'] if c in final_df.columns), None)
 
         MONTH_ORDER_ASC = {
             "JANUARY": 1, "FEBRUARY": 2, "MARCH": 3, "APRIL": 4,
@@ -1179,22 +1187,124 @@ if uploaded_files:
         ])
 
         with main_tab1:
-            st.caption("Inspect individual sheets/files tab-by-tab for each uploaded file.")
-            selected_file_name = st.selectbox("Select Uploaded File to Preview:", list(raw_files_dict.keys()), key="raw_file_sel")
-            if selected_file_name:
-                sheets = raw_files_dict[selected_file_name]
-                selected_sheet = st.selectbox("Select Sheet Tab:", list(sheets.keys()), key="raw_sheet_sel")
-                if selected_sheet:
-                    raw_styled = format_dashboard_dataframe(sheets[selected_sheet].head(100)).style.set_properties(**{
+            st.caption("Inspect individual sheets/files tab-by-tab or use dedicated Ads & Sales Raw filters below.")
+            
+            raw_sub_tab1, raw_sub_tab2, raw_sub_tab3 = st.tabs([
+                "📂 Standard File & Sheet Inspector",
+                "🎯 Ads Raw Filter & Overview",
+                "📦 Overall Sales Raw Filter & Overview"
+            ])
+
+            with raw_sub_tab1:
+                selected_file_name = st.selectbox("Select Uploaded File to Preview:", list(raw_files_dict.keys()), key="raw_file_sel")
+                if selected_file_name:
+                    sheets = raw_files_dict[selected_file_name]
+                    selected_sheet = st.selectbox("Select Sheet Tab:", list(sheets.keys()), key="raw_sheet_sel")
+                    if selected_sheet:
+                        raw_styled = format_dashboard_dataframe(sheets[selected_sheet].head(100)).style.set_properties(**{
+                            'text-align': 'center', 'vertical-align': 'middle'
+                        }).set_table_styles([
+                            {'selector': 'th', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]},
+                            {'selector': 'td', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]}
+                        ])
+                        st.dataframe(raw_styled, use_container_width=True, hide_index=True)
+
+            with raw_sub_tab2:
+                st.markdown("#### 🎯 Ads Campaign Raw Data Filter & Overview")
+                campaign_col_candidates = [c for c in ['Campaign Name', 'Campaign', 'CampaignId', 'Campaign ID'] if c in final_df.columns]
+                if campaign_col_candidates:
+                    camp_col_name = campaign_col_candidates[0]
+                    unique_campaigns = sorted([str(x) for x in final_df[camp_col_name].dropna().unique()])
+                    selected_campaign_filter = st.selectbox("Select Campaign Name for Ads Raw View & Export:", ["All Campaigns"] + unique_campaigns, key="ads_raw_campaign_filter")
+
+                    ads_filtered_raw = final_df.copy()
+                    if selected_campaign_filter != "All Campaigns":
+                        ads_filtered_raw = ads_filtered_raw[ads_filtered_raw[camp_col_name].astype(str) == selected_campaign_filter]
+
+                    f_ad_sales = round(ads_filtered_raw['_sales'].sum(), 2)
+                    f_ad_spends = round(ads_filtered_raw['_budget_consumed'].sum(), 2)
+                    f_ad_imp = int(ads_filtered_raw['_impressions'].sum())
+                    f_ad_orders = int(ads_filtered_raw['_orders'].sum())
+                    f_ad_roas = round(f_ad_sales / f_ad_spends, 2) if f_ad_spends > 0 else 0.0
+
+                    acol1, acol2, acol3, acol4 = st.columns(4)
+                    with acol1: st.metric("Filtered Ad Sales", f"₹{int(round(f_ad_sales)):,}")
+                    with acol2: st.metric("Filtered Spends", f"₹{int(round(f_ad_spends)):,}")
+                    with acol3: st.metric("Filtered Ad ROAS", f"{f_ad_roas:.2f}x")
+                    with acol4: st.metric("Filtered Impressions", f"{f_ad_imp:,}")
+
+                    st.markdown("##### Filtered Ads Raw Data Preview:")
+                    preview_ads_raw = ads_filtered_raw.drop(columns=[c for c in ads_filtered_raw.columns if c.startswith('_')], errors='ignore')
+                    
+                    ads_raw_styled = format_dashboard_dataframe(preview_ads_raw.head(200)).style.set_properties(**{
                         'text-align': 'center', 'vertical-align': 'middle'
                     }).set_table_styles([
                         {'selector': 'th', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]},
                         {'selector': 'td', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]}
                     ])
-                    st.dataframe(raw_styled, use_container_width=True, hide_index=True)
+                    st.dataframe(ads_raw_styled, use_container_width=True, hide_index=True)
+
+                    ads_raw_excel_bytes = convert_dataframe_to_excel_download(preview_ads_raw, sheet_name="Ads_Raw_Filtered")
+                    st.download_button(
+                        label="📥 Download Filtered Ads Raw Data (.xlsx)",
+                        data=ads_raw_excel_bytes,
+                        file_name=f"Ads_Raw_Filtered_{selected_campaign_filter.replace(' ', '_')[:20]}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="btn_dl_ads_raw_filtered"
+                    )
+                else:
+                    st.info("Campaign Name column not found in ads data.")
+
+            with raw_sub_tab3:
+                st.markdown("#### 📦 Overall Sales Raw Data Product Syllable Filter & Overview")
+                if not master_sales_df.empty:
+                    product_col_candidates = [c for c in ['Item Name', 'Product Name', 'Product', 'item_name'] if c in master_sales_df.columns]
+                    if product_col_candidates:
+                        prod_col_name = product_col_candidates[0]
+                        product_syllable_input = st.text_input("Type Product Name Syllable / Keyword (e.g., 'oil', 'masala', 'atta'):", "", key="sales_raw_syllable_input")
+
+                        sales_filtered_raw = master_sales_df.copy()
+                        if product_syllable_input.strip():
+                            query_str = product_syllable_input.strip().lower()
+                            sales_filtered_raw = sales_filtered_raw[sales_filtered_raw[prod_col_name].astype(str).str.lower().str.contains(query_str, na=False)]
+
+                        f_sales_amt = round(sales_filtered_raw['_gross_amt'].sum(), 2) if '_gross_amt' in sales_filtered_raw.columns else 0.0
+                        f_sales_qty = int(sales_filtered_raw['_qty'].sum()) if '_qty' in sales_filtered_raw.columns else len(sales_filtered_raw)
+                        f_sales_orders = len(sales_filtered_raw)
+                        f_aov = round(f_sales_amt / f_sales_orders, 2) if f_sales_orders > 0 else 0.0
+
+                        scol1, scol2, scol3, scol4 = st.columns(4)
+                        with scol1: st.metric("Filtered Sales Amount", f"₹{int(round(f_sales_amt)):,}")
+                        with scol2: st.metric("Filtered Units Sold", f"{f_sales_qty:,}")
+                        with scol3: st.metric("Filtered Total Orders", f"{f_sales_orders:,}")
+                        with scol4: st.metric("Filtered AOV", f"₹{f_aov:,.2f}")
+
+                        st.markdown("##### Filtered Sales Raw Data Preview:")
+                        preview_sales_raw = sales_filtered_raw.drop(columns=[c for c in sales_filtered_raw.columns if c.startswith('_')], errors='ignore')
+
+                        sales_raw_styled = format_dashboard_dataframe(preview_sales_raw.head(200)).style.set_properties(**{
+                            'text-align': 'center', 'vertical-align': 'middle'
+                        }).set_table_styles([
+                            {'selector': 'th', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]},
+                            {'selector': 'td', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]}
+                        ])
+                        st.dataframe(sales_raw_styled, use_container_width=True, hide_index=True)
+
+                        sales_raw_excel_bytes = convert_dataframe_to_excel_download(preview_sales_raw, sheet_name="Overall_Sales_Raw_Filtered")
+                        st.download_button(
+                            label="📥 Download Filtered Sales Raw Data (.xlsx)",
+                            data=sales_raw_excel_bytes,
+                            file_name=f"Overall_Sales_Filtered_{product_syllable_input.strip().replace(' ', '_')[:15] or 'All'}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key="btn_dl_sales_raw_filtered"
+                        )
+                    else:
+                        st.info("Product/Item Name column not found in sales reports.")
+                else:
+                    st.info("Please upload Sales Reports to use this feature.")
 
         with main_tab2:
-            st.caption("Preview the combined dataset across all uploaded files.")
+            st.caption("Preview the combined dataset across all uploaded files[cite: 7].")
             preview_clean_df = final_df.drop(columns=['_impressions', '_direct_atc', '_indirect_atc', '_atc', '_direct_orders', '_indirect_orders', '_orders', '_direct_sales', '_indirect_sales', '_sales', '_budget_consumed', '_date_dt', '_most_viewed_position', 'Ad Type Combined'], errors='ignore')
             master_styled = format_dashboard_dataframe(preview_clean_df.head(100)).style.set_properties(**{
                 'text-align': 'center', 'vertical-align': 'middle'
@@ -1550,7 +1660,6 @@ if uploaded_files:
         st.markdown("---")
         st.subheader("💾 Download Consolidated Master Workbook")
         
-        # Build ADs Dump & Overall Dump
         ads_dump_df = final_df.copy()
         
         def build_relative_month_map(dt_series_list):
@@ -1639,7 +1748,6 @@ if uploaded_files:
 
         final_ads_dump_export = pd.DataFrame(ads_export_mapping)
 
-        # Build Overall Dump
         if not master_sales_df.empty:
             s_dump_df = master_sales_df.copy()
             if '_sales_dt' in s_dump_df.columns:
