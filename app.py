@@ -11,7 +11,7 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 
 st.set_page_config(
     page_title="Blinkit Ad Report & Sales Merger & Analytics",
-    page_icon="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iI2ZkZDA0MyIvPjx0ZXh0IHg9IjI1NiIgeT0iMzIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2x0IiBmb250LXNpemU9IjIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+PGZzcGFuIGZpbGw9IiMwMDAwMDAiPmJsaW5rPC9mc3Bhbj48ZnNwYW4gZmlsbD0iIzAwODEwNyI+aXQ8L2ZzcGFuPjwvdGV4dD48L3N2Zz4=",
+    page_icon="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iI2ZkZDA0MyIvPjx0ZXh0IHg9IjI1NiIgeT0iMzIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2x0IiBmb250LXNpemU9IjIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+PGZzcGFuIGZpbGw9IiMwMDAwMDAiPmJsaW5rPC9mc3Bhbj48ZnNwYW4gZmlsbD0iIzAwODEwNyI+aXQ8L2ZzcBhbj48L3RleHQ+PC9zdmc+",
     layout="wide"
 )
 
@@ -136,7 +136,6 @@ st.markdown("""
         color: #FFFFFF !important;
     }
 
-    /* ABSOLUTE CENTER ALIGNMENT FOR ALL DATAFRAME HEADERS & CELLS */
     [data-testid="stDataFrame"] {
         border: 1px solid var(--dash-border);
         border-radius: 12px;
@@ -651,21 +650,6 @@ if uploaded_files:
 
         date_col = next((c for c in ['Date', 'date', 'Day', 'DATE', 'date_ist', 'timestamp'] if c in final_df.columns), None)
 
-        if date_col and '_date_dt' in final_df.columns:
-            def assign_week_formatted(row):
-                dt = row['_date_dt']
-                if pd.isna(dt): return np.nan
-                day = dt.day
-                if 1 <= day <= 7: return "Week 1 (1-7)"
-                elif 8 <= day <= 14: return "Week 2 (8-14)"
-                elif 15 <= day <= 21: return "Week 3 (15-21)"
-                elif 22 <= day <= 28: return "Week 4 (22-28)"
-                elif day >= 29: return "Week 5 (29-31)"
-                return np.nan
-            final_df['Week'] = final_df.apply(assign_week_formatted, axis=1)
-        else:
-            final_df['Week'] = np.nan
-
         MONTH_ORDER_ASC = {
             "JANUARY": 1, "FEBRUARY": 2, "MARCH": 3, "APRIL": 4,
             "MAY": 5, "JUNE": 6, "JULY": 7, "AUGUST": 8,
@@ -794,7 +778,7 @@ if uploaded_files:
             total_imp_sum = res_df['Impressions'].sum()
             avg_cpm = round(res_df['CPM'].mean(), 2)
             avg_roas = round(total_ad_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
-            avg_troas = round(total_sales_sum / total_spends_sum, 2) if total_sales_sum > 0 else 0.0
+            avg_troas = round(total_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
             avg_tacos = round((total_spends_sum / total_sales_sum) * 100, 2) if total_sales_sum > 0 else 0.0
             avg_acos = round((total_spends_sum / total_ad_sales_sum) * 100, 2) if total_ad_sales_sum > 0 else 0.0
 
@@ -882,18 +866,28 @@ if uploaded_files:
             return pivot_df
 
         def create_weekly_comparison_table_with_sales(df_input, selected_months=None):
-            working_df = df_input.dropna(subset=['Week', 'Month']).copy()
+            # Helper for strict Monday-to-Sunday weekly aggregation mapping
+            def assign_week_formatted_dashboard(dt):
+                if pd.isna(dt): return np.nan
+                iso_year, iso_week, iso_day = dt.isocalendar()
+                start_of_week = dt - pd.Timedelta(days=iso_day - 1)
+                end_of_week = start_of_week + pd.Timedelta(days=6)
+                return f"Week {iso_week} ({start_of_week.strftime('%b %d')} to {end_of_week.strftime('%b %d')})"
+
+            working_df = df_input.dropna(subset=['_date_dt', 'Month']).copy()
+            working_df['Dashboard_Week'] = working_df['_date_dt'].apply(assign_week_formatted_dashboard)
+            
             if selected_months:
                 working_df = working_df[working_df['Month'].isin(selected_months)]
             if working_df.empty:
                 return pd.DataFrame()
 
-            weeks_list = sorted(working_df['Week'].dropna().unique(), key=lambda w: int(''.join(filter(str.isdigit, str(w))) or 99))
+            weeks_list = sorted(working_df['Dashboard_Week'].dropna().unique(), key=lambda w: int(''.join(filter(str.isdigit, str(w))) or 99))
             has_sales = not master_sales_df.empty and '_sales_dt' in master_sales_df.columns
 
             rows = []
             for w in weeks_list:
-                w_df = working_df[working_df['Week'] == w]
+                w_df = working_df[working_df['Dashboard_Week'] == w]
                 imp = w_df['_impressions'].sum()
                 spends = round(w_df['_budget_consumed'].sum(), 2)
                 sales = round(w_df['_sales'].sum(), 2)
@@ -1511,10 +1505,9 @@ if uploaded_files:
         st.markdown("---")
         st.subheader("💾 Download Consolidated Master Workbook")
         
-        # Build ADs Dump
+        # Build ADs Dump & Overall Dump with Mon-to-Sun ISO Week calculation
         ads_dump_df = final_df.copy()
         
-        # Duration Helper Functions formatted exactly as requested
         def get_duration_month(dt):
             if pd.isna(dt): return np.nan
             m_short = dt.strftime('%b')
@@ -1527,9 +1520,7 @@ if uploaded_files:
             iso_year, iso_week, iso_day = dt.isocalendar()
             start_of_week = dt - pd.Timedelta(days=iso_day - 1)
             end_of_week = start_of_week + pd.Timedelta(days=6)
-            s_str = start_of_week.strftime('%b %d')
-            e_str = end_of_week.strftime('%b %d')
-            return f"Week {iso_week} ({s_str} to {e_str})"
+            return f"Week {iso_week} ({start_of_week.strftime('%b %d')} to {end_of_week.strftime('%b %d')})"
 
         if '_date_dt' in ads_dump_df.columns:
             ads_dump_df['Duration (Month)'] = ads_dump_df['_date_dt'].apply(get_duration_month)
