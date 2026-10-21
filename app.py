@@ -11,7 +11,7 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 
 st.set_page_config(
     page_title="Blinkit Ad Report & Sales Merger & Analytics",
-    page_icon="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iI2ZkZDA0MyIvPjx0ZXh0IHg9IjI1NiIgeT0iMzIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2x0IiBmb250LXNpemU9IjIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+PGZzcpanIGZpbGw9IiMwMDAwMDAiPmJsaW5rPC9mc3Bhbj48ZnNwYW4gZmlsbD0iIzAwODEwNyI+aXQ8L2ZzcBhbj48L3RleHQ+PC9zdmc+",
+    page_icon="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iI2ZkZDA0MyIvPjx0ZXh0IHg9IjI1NiIgeT0iMzIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2x0IiBmb250LXNpemU9IjIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+PGZzcGFuIGZpbGw9IiMwMDAwMDAiPmJsaW5rPC9mc3Bhbj48ZnNwYW4gZmlsbD0iIzAwODEwNyI+aXQ8L2ZzcGFuPjwvdGV4dD48L3N2Zz4=",
     layout="wide"
 )
 
@@ -532,7 +532,7 @@ if uploaded_files:
         try:
             xls = pd.ExcelFile(uploaded_file)
             sheets_to_process = xls.sheet_names[1:] if len(xls.sheet_names) > 1 else xls.sheet_names
-            valid_sheet_names = [s for s in sheets_to_process if s.strip().lower() not in ['consolidated_master', 'summary', 'overall']]
+            valid_sheet_names = [s for s in sheets_to_process if s.strip().lower() not in ['consolidated_master', 'summary', 'overall', 'ads dump', 'overall dump']]
 
             for sheet_name in valid_sheet_names:
                 df = pd.read_excel(xls, sheet_name=sheet_name)
@@ -642,8 +642,6 @@ if uploaded_files:
         final_df['_sales'] = final_df['_direct_sales'] + final_df['_indirect_sales']
 
         final_df['_budget_consumed'] = get_numeric_col(final_df, ['Estimated Budget Consumed', 'Budget Consumed', 'Spend'])
-        
-        # Most Viewed Position support column
         final_df['_most_viewed_position'] = get_numeric_col(final_df, ['Most Viewed Position', 'Viewed Position', 'Average Position', 'Position'])
 
         if match_col and match_col in final_df.columns:
@@ -796,7 +794,7 @@ if uploaded_files:
             total_imp_sum = res_df['Impressions'].sum()
             avg_cpm = round(res_df['CPM'].mean(), 2)
             avg_roas = round(total_ad_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
-            avg_troas = round(total_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
+            avg_troas = round(total_sales_sum / total_spends_sum, 2) if total_sales_sum > 0 else 0.0
             avg_tacos = round((total_spends_sum / total_sales_sum) * 100, 2) if total_sales_sum > 0 else 0.0
             avg_acos = round((total_spends_sum / total_ad_sales_sum) * 100, 2) if total_ad_sales_sum > 0 else 0.0
 
@@ -1275,7 +1273,6 @@ if uploaded_files:
                                 min_dt = valid_dates_df['_date_dt'].min().date()
                                 max_dt = valid_dates_df['_date_dt'].max().date()
                                 
-                                # Fully supports single day clicks or full ranges seamlessly using a tuple/list format
                                 kw_date_selection = st.date_input(
                                     "Filter by Date (Single Day or Date Range):",
                                     value=[min_dt, max_dt],
@@ -1286,7 +1283,6 @@ if uploaded_files:
                             else:
                                 kw_date_selection = None
 
-                    # Apply Professional Filter Logic supporting single dates, custom lists, or date ranges
                     kw_filtered_df = final_df.copy()
                     if selected_kw_months:
                         kw_filtered_df = kw_filtered_df[kw_filtered_df['Month'].isin(selected_kw_months)]
@@ -1307,7 +1303,6 @@ if uploaded_files:
                                     (kw_filtered_df['_date_dt'].dt.date == single_d)
                                 ]
                         else:
-                            # Single date selected
                             single_d = kw_date_selection
                             kw_filtered_df = kw_filtered_df[
                                 kw_filtered_df['_date_dt'].notna() &
@@ -1515,19 +1510,128 @@ if uploaded_files:
 
         st.markdown("---")
         st.subheader("💾 Download Consolidated Master Workbook")
+        
+        # Build ADs Dump
+        ads_dump_df = final_df.copy()
+        
+        # Duration Helper Functions formatted exactly as requested
+        def get_duration_month(dt):
+            if pd.isna(dt): return np.nan
+            m_short = dt.strftime('%b')
+            m_num = dt.month
+            y_two = dt.strftime('%y')
+            return f"{m_num}. {m_short}'{y_two}"
+
+        def get_duration_week(dt):
+            if pd.isna(dt): return np.nan
+            iso_year, iso_week, iso_day = dt.isocalendar()
+            start_of_week = dt - pd.Timedelta(days=iso_day - 1)
+            end_of_week = start_of_week + pd.Timedelta(days=6)
+            s_str = start_of_week.strftime('%b %d')
+            e_str = end_of_week.strftime('%b %d')
+            return f"Week {iso_week} ({s_str} to {e_str})"
+
+        if '_date_dt' in ads_dump_df.columns:
+            ads_dump_df['Duration (Month)'] = ads_dump_df['_date_dt'].apply(get_duration_month)
+            ads_dump_df['Duration (Week)'] = ads_dump_df['_date_dt'].apply(get_duration_week)
+            ads_dump_df['date_ist'] = ads_dump_df['_date_dt'].dt.strftime('%Y/%m/%d')
+        else:
+            ads_dump_df['Duration (Month)'] = np.nan
+            ads_dump_df['Duration (Week)'] = np.nan
+            ads_dump_df['date_ist'] = np.nan
+
+        def safe_get_col(df_source, possible_names):
+            for name in possible_names:
+                if name in df_source.columns:
+                    return df_source[name]
+            return np.nan
+
+        ads_export_mapping = {
+            'Duration (Month)': ads_dump_df['Duration (Month)'],
+            'Duration (Week)': ads_dump_df['Duration (Week)'],
+            'Manufacturer': safe_get_col(ads_dump_df, ['Manufacturer', 'Manufacturer Name', 'manufacturer_name']),
+            'date_ist': ads_dump_df['date_ist'],
+            'Campaign ID': safe_get_col(ads_dump_df, ['Campaign ID', 'CampaignId']),
+            'Campaign Name': safe_get_col(ads_dump_df, ['Campaign Name', 'Campaign']),
+            'City': safe_get_col(ads_dump_df, ['City', 'Supply City', 'city_name']),
+            'Ad type': safe_get_col(ads_dump_df, ['Ad type', 'Ad Type', 'Match Type', 'Ad Type Combined']),
+            'Targeting Type': safe_get_col(ads_dump_df, ['Targeting Type', 'Targeting']),
+            'Franchise': safe_get_col(ads_dump_df, ['Franchise', 'Brand']),
+            'Category': safe_get_col(ads_dump_df, ['Category', 'category']),
+            'Sub Category': safe_get_col(ads_dump_df, ['Sub Category', 'Subcategory']),
+            'Keyword': safe_get_col(ads_dump_df, ['Keyword', 'Search Term', 'Targeting Value']),
+            'Most Viewed Position': ads_dump_df['_most_viewed_position'],
+            'Match Type': safe_get_col(ads_dump_df, ['Match Type', 'Targeting Type']),
+            'Pacing Type': safe_get_col(ads_dump_df, ['Pacing Type']),
+            'CPM': safe_get_col(ads_dump_df, ['CPM']),
+            'Total Budget': safe_get_col(ads_dump_df, ['Total Budget', 'Budget']),
+            'Impressions': ads_dump_df['_impressions'],
+            'Direct ATC': ads_dump_df['_direct_atc'],
+            'Indirect ATC': ads_dump_df['_indirect_atc'],
+            'New Users': safe_get_col(ads_dump_df, ['New Users']),
+            'Direct Sales': ads_dump_df['_direct_sales'],
+            'Indirect Sales': ads_dump_df['_indirect_sales'],
+            'Direct Quantities Sold': ads_dump_df['_direct_orders'],
+            'Indirect Quantities Sold': ads_dump_df['_indirect_orders'],
+            'Estimated Budget Consumed': ads_dump_df['_budget_consumed'],
+            'Direct RoAS': safe_get_col(ads_dump_df, ['Direct RoAS', 'Direct ROAS']),
+            'Total RoAS': safe_get_col(ads_dump_df, ['Total RoAS', 'Total ROAS', 'ROAS']),
+            'latest on hold timestamp': safe_get_col(ads_dump_df, ['latest on hold timestamp'])
+        }
+
+        final_ads_dump_export = pd.DataFrame(ads_export_mapping)
+
+        # Build Overall Dump
+        if not master_sales_df.empty:
+            s_dump_df = master_sales_df.copy()
+            if '_sales_dt' in s_dump_df.columns:
+                s_dump_df['Duration (Month)'] = s_dump_df['_sales_dt'].apply(get_duration_month)
+                s_dump_df['Duration (Week)'] = s_dump_df['_sales_dt'].apply(get_duration_week)
+                s_dump_df['date'] = s_dump_df['_sales_dt'].dt.strftime('%Y/%m/%d')
+            else:
+                s_dump_df['Duration (Month)'] = np.nan
+                s_dump_df['Duration (Week)'] = np.nan
+                s_dump_df['date'] = np.nan
+
+            overall_export_mapping = {
+                'item_id': safe_get_col(s_dump_df, ['item_id', 'Item ID', 'SKU ID', 'Product ID']),
+                'item_name': safe_get_col(s_dump_df, ['item_name', 'Item Name', 'Product Name', 'Product']),
+                'Franchise': safe_get_col(s_dump_df, ['Franchise', 'Brand']),
+                'manufacturer_id': safe_get_col(s_dump_df, ['manufacturer_id', 'Manufacturer ID']),
+                'manufacturer_name': safe_get_col(s_dump_df, ['manufacturer_name', 'Manufacturer', 'Manufacturer Name']),
+                'city_id': safe_get_col(s_dump_df, ['city_id', 'City ID']),
+                'city_name': safe_get_col(s_dump_df, ['city_name', 'City', 'Supply City']),
+                'category': safe_get_col(s_dump_df, ['category', 'Category']),
+                'date': s_dump_df['date'],
+                'Duration (Month)': s_dump_df['Duration (Month)'],
+                'Duration (Week)': s_dump_df['Duration (Week)'],
+                'qty_sold': s_dump_df['_qty'],
+                'mrp': safe_get_col(s_dump_df, ['mrp', 'MRP', 'Selling Price (Rs)']),
+                'Region': safe_get_col(s_dump_df, ['Region', 'Supply State', 'State'])
+            }
+            final_overall_dump_export = pd.DataFrame(overall_export_mapping)
+        else:
+            final_overall_dump_export = pd.DataFrame(columns=[
+                'item_id', 'item_name', 'Franchise', 'manufacturer_id', 'manufacturer_name',
+                'city_id', 'city_name', 'category', 'date', 'Duration (Month)',
+                'Duration (Week)', 'qty_sold', 'mrp', 'Region'
+            ])
+
         buffer_multi = io.BytesIO()
         with pd.ExcelWriter(buffer_multi, engine='openpyxl') as writer:
+            # First initial tabs: Dumps
+            final_ads_dump_export.to_excel(writer, sheet_name='ADs Dump', index=False)
+            final_overall_dump_export.to_excel(writer, sheet_name='Overall Dump', index=False)
+
+            # Followed by individual raw file tabs
             for raw_tab_name, df_list in consolidated_raw_tabs.items():
                 combined_raw_tab_df = pd.concat(df_list, ignore_index=True)
                 clean_sheet_name = raw_tab_name[:31]
                 combined_raw_tab_df.to_excel(writer, sheet_name=clean_sheet_name, index=False)
-            
-            master_export_df = final_df.drop(columns=['_impressions', '_direct_atc', '_indirect_atc', '_atc', '_direct_orders', '_indirect_orders', '_orders', '_direct_sales', '_indirect_sales', '_sales', '_budget_consumed', '_date_dt', '_most_viewed_position', 'Ad Type Combined'], errors='ignore')
-            master_export_df.to_excel(writer, sheet_name='Consolidated_Master', index=False)
 
         buffer_multi.seek(0)
         st.download_button(
-            label="📥 Download Complete Excel Workbook (Consolidated Raw Tabs + Final Master Tab)",
+            label="📥 Download Complete Excel Workbook (Initial Dumps + Raw Tabs)",
             data=buffer_multi,
             file_name="Blinkit_Consolidated_Master_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
