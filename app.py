@@ -1064,32 +1064,40 @@ if uploaded_files:
                 })
 
             res_df = pd.DataFrame(rows)
-            total_sales_sum = res_df['Total Sales'].sum()
-            total_orders_sum = res_df['Total Orders'].sum()
-            total_spends_sum = res_df['Spends'].sum()
-            total_ad_sales_sum = res_df['Ad Sales'].sum()
-            total_ad_orders_sum = res_df['Ad Orders'].sum()
-            total_atc_sum = res_df['ATC'].sum()
-            total_imp_sum = res_df['Impressions'].sum()
-            avg_cpm = round(res_df['CPM'].mean(), 2)
+            # Reordered columns: Spends, Ad Sales, Total Sales, Ad ROAS, TROAS, TACOS, Impressions, CPM, ATC, Ad Orders, Total Orders
+            desired_col_order = [
+                'Date (Day)', 'Spends', 'Ad Sales', 'Total Sales', 'Ad ROAS', 'TROAS', 
+                'TACOS', 'Impressions', 'CPM', 'ATC', 'Ad Orders', 'Total Orders'
+            ]
+            res_df = res_df[[c for c in desired_col_order if c in res_df.columns]]
+
+            total_sales_sum = res_df['Total Sales'].sum() if 'Total Sales' in res_df.columns else 0.0
+            total_orders_sum = res_df['Total Orders'].sum() if 'Total Orders' in res_df.columns else 0
+            total_spends_sum = res_df['Spends'].sum() if 'Spends' in res_df.columns else 0.0
+            total_ad_sales_sum = res_df['Ad Sales'].sum() if 'Ad Sales' in res_df.columns else 0.0
+            total_ad_orders_sum = res_df['Ad Orders'].sum() if 'Ad Orders' in res_df.columns else 0
+            total_atc_sum = res_df['ATC'].sum() if 'ATC' in res_df.columns else 0
+            total_imp_sum = res_df['Impressions'].sum() if 'Impressions' in res_df.columns else 0
+            avg_cpm = round(res_df['CPM'].mean(), 2) if 'CPM' in res_df.columns else 0.0
             avg_roas = round(total_ad_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
             avg_tacos = round((total_spends_sum / total_sales_sum) * 100, 2) if total_sales_sum > 0 else 0.0
             avg_troas = round(total_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
 
-            summary_row = pd.DataFrame([{
+            summary_row_dict = {
                 'Date (Day)': 'Aggregate / Average',
-                'CPM': avg_cpm,
-                'Impressions': total_imp_sum,
                 'Spends': total_spends_sum,
                 'Ad Sales': total_ad_sales_sum,
                 'Total Sales': total_sales_sum,
-                'Ad Orders': total_ad_orders_sum,
-                'Total Orders': total_orders_sum,
-                'ATC': int(total_atc_sum),
-                'TACOS': f"{avg_tacos:.2f}%",
                 'Ad ROAS': avg_roas,
-                'TROAS': avg_troas
-            }])
+                'TROAS': avg_troas,
+                'TACOS': f"{avg_tacos:.2f}%",
+                'Impressions': total_imp_sum,
+                'CPM': avg_cpm,
+                'ATC': int(total_atc_sum),
+                'Ad Orders': total_ad_orders_sum,
+                'Total Orders': total_orders_sum
+            }
+            summary_row = pd.DataFrame([{k: summary_row_dict[k] for k in res_df.columns if k in summary_row_dict}])
             res_df = pd.concat([res_df, summary_row], ignore_index=True)
             return res_df
 
@@ -1304,7 +1312,7 @@ if uploaded_files:
                     st.info("Please upload Sales Reports to use this feature.")
 
         with main_tab2:
-            st.caption("Preview the combined dataset across all uploaded files[cite: 7].")
+            st.caption("Preview the combined dataset across all uploaded files.")
             preview_clean_df = final_df.drop(columns=['_impressions', '_direct_atc', '_indirect_atc', '_atc', '_direct_orders', '_indirect_orders', '_orders', '_direct_sales', '_indirect_sales', '_sales', '_budget_consumed', '_date_dt', '_most_viewed_position', 'Ad Type Combined'], errors='ignore')
             master_styled = format_dashboard_dataframe(preview_clean_df.head(100)).style.set_properties(**{
                 'text-align': 'center', 'vertical-align': 'middle'
