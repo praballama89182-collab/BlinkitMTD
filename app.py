@@ -296,7 +296,6 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 if is_grand_total:
                     val_cell.fill = total_fill
                 
-                # First column left-aligned for Daily Tracker if index is not default, but here columns are data values
                 if c_idx == 1 and is_daily_tracker:
                     val_cell.alignment = align_left
                 else:
@@ -337,15 +336,21 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
 def convert_all_pivots_to_excel(pivot_dict):
     buffer = io.BytesIO()
     wb = openpyxl.Workbook()
-    wb.remove(wb.active)
+    wb.remove(wb.active) # Remove default sheet
 
     for sheet_name, pivot_df in pivot_dict.items():
         if pivot_df is not None and not pivot_df.empty:
-            # We can use style_and_export_pivot logic for each sheet
             sheet_bytes = style_and_export_pivot(pivot_df, sheet_name=sheet_name)
-            # Read back workbook bytes or build directly
-            # To keep it clean, let's just let style_and_export_pivot handle single sheet and merge or build multi-sheet:
-            pass
+            # Load sheet_bytes into wb
+            temp_wb = openpyxl.load_workbook(io.BytesIO(sheet_bytes))
+            temp_ws = temp_wb.active
+            temp_ws.title = sheet_name[:31]
+            # Copy sheet to wb
+            wb._sheets.append(temp_ws)
+
+    if not wb._sheets:
+        ws = wb.create_sheet(title="Sheet1")
+        ws.cell(row=1, column=1, value="No Data")
 
     wb.save(buffer)
     buffer.seek(0)
@@ -1718,7 +1723,7 @@ if uploaded_files:
 
         buffer_multi.seek(0)
         st.download_button(
-            label="📥 Download Complete ExcelWorkbook (Initial Dumps + Raw Tabs)",
+            label="📥 Download Complete Excel Workbook (Initial Dumps + Raw Tabs)",
             data=buffer_multi,
             file_name="Blinkit_Consolidated_Master_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
