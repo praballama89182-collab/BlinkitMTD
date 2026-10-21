@@ -11,7 +11,7 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 
 st.set_page_config(
     page_title="Blinkit Ad Report & Sales Merger & Analytics",
-    page_icon="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iI2ZkZDA0MyIvPjx0ZXh0IHg9IjI1NiIgeT0iMzIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2x0IiBmb250LXNpemU9IjIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+PGZzcGFuIGZpbGw9IiMwMDAwMDAiPmJsaW5rPC9mc3Bhbj48ZnNwYW4gZmlsbD0iIzAwODEwNyI+aXQ8L2ZzcBhbj48L3RleHQ+PC9zdmc+",
+    page_icon="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iI2ZkZDA0MyIvPjx0ZXh0IHg9IjI1NiIgeT0iMzIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2x0IiBmb250LXNpemU9IjIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+PGZzcGFuIGZpbGw9IiMwMDAwMDAiPmJsaW5rPC9mc3Bhbj48ZnNwYW4gZmlsbD0iIzAwODEwNyI+aXQ8L2ZzcGFuPjwvdGV4dD48L3N2Zz4=",
     layout="wide"
 )
 
@@ -866,7 +866,6 @@ if uploaded_files:
             return pivot_df
 
         def create_weekly_comparison_table_with_sales(df_input, selected_months=None):
-            # Helper for strict Monday-to-Sunday weekly aggregation mapping
             def assign_week_formatted_dashboard(dt):
                 if pd.isna(dt): return np.nan
                 iso_year, iso_week, iso_day = dt.isocalendar()
@@ -1505,15 +1504,40 @@ if uploaded_files:
         st.markdown("---")
         st.subheader("💾 Download Consolidated Master Workbook")
         
-        # Build ADs Dump & Overall Dump with Mon-to-Sun ISO Week calculation
+        # Build ADs Dump & Overall Dump
         ads_dump_df = final_df.copy()
         
-        def get_duration_month(dt):
+        # Build Sequential Month Map (1, 2, 3...) based on chronological order of uploaded data
+        def build_relative_month_map(dt_series_list):
+            all_valid_dates = pd.concat(dt_series_list).dropna().unique()
+            if len(all_valid_dates) == 0:
+                return {}
+            
+            # Extract unique (year, month) pairs sorted chronologically
+            dt_df = pd.DataFrame({'dt': pd.to_datetime(all_valid_dates)})
+            dt_df['year_month'] = dt_df['dt'].dt.to_period('M')
+            sorted_unique_ym = sorted(dt_df['year_month'].unique())
+            
+            month_map = {}
+            for idx, ym in enumerate(sorted_unique_ym, start=1):
+                m_short = ym.strftime('%b')
+                y_two = ym.strftime('%y')
+                month_map[ym] = f"{idx}. {m_short}'{y_two}"
+            return month_map
+
+        # Collect dates from both ADs and Sales datasets for a unified relative month mapping
+        all_dt_series = []
+        if '_date_dt' in ads_dump_df.columns:
+            all_dt_series.append(ads_dump_df['_date_dt'])
+        if not master_sales_df.empty and '_sales_dt' in master_sales_df.columns:
+            all_dt_series.append(master_sales_df['_sales_dt'])
+
+        relative_month_mapping = build_relative_month_map(all_dt_series) if all_dt_series else {}
+
+        def get_duration_month_relative(dt):
             if pd.isna(dt): return np.nan
-            m_short = dt.strftime('%b')
-            m_num = dt.month
-            y_two = dt.strftime('%y')
-            return f"{m_num}. {m_short}'{y_two}"
+            ym = dt.to_period('M')
+            return relative_month_mapping.get(ym, np.nan)
 
         def get_duration_week(dt):
             if pd.isna(dt): return np.nan
@@ -1523,7 +1547,7 @@ if uploaded_files:
             return f"Week {iso_week} ({start_of_week.strftime('%b %d')} to {end_of_week.strftime('%b %d')})"
 
         if '_date_dt' in ads_dump_df.columns:
-            ads_dump_df['Duration (Month)'] = ads_dump_df['_date_dt'].apply(get_duration_month)
+            ads_dump_df['Duration (Month)'] = ads_dump_df['_date_dt'].apply(get_duration_month_relative)
             ads_dump_df['Duration (Week)'] = ads_dump_df['_date_dt'].apply(get_duration_week)
             ads_dump_df['date_ist'] = ads_dump_df['_date_dt'].dt.strftime('%Y/%m/%d')
         else:
@@ -1576,7 +1600,7 @@ if uploaded_files:
         if not master_sales_df.empty:
             s_dump_df = master_sales_df.copy()
             if '_sales_dt' in s_dump_df.columns:
-                s_dump_df['Duration (Month)'] = s_dump_df['_sales_dt'].apply(get_duration_month)
+                s_dump_df['Duration (Month)'] = s_dump_df['_sales_dt'].apply(get_duration_month_relative)
                 s_dump_df['Duration (Week)'] = s_dump_df['_sales_dt'].apply(get_duration_week)
                 s_dump_df['date'] = s_dump_df['_sales_dt'].dt.strftime('%Y/%m/%d')
             else:
