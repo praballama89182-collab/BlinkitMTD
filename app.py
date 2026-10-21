@@ -11,7 +11,7 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 
 st.set_page_config(
     page_title="Blinkit Ad Report & Sales Merger & Analytics",
-    page_icon="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iI2ZkZDA0MyIvPjx0ZXh0IHg9IjI1NiIgeT0iMzIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2x0IiBmb250LXNpemU9IjIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+PGZzcGFuIGZpbGw9IiMwMDAwMDAiPmJsaW5rPC9mc3Bhbj48ZnNwYW4gZmlsbD0iIzAwODEwNyI+aXQ8L2ZzcGFuPjwvdGV4dD48L3N2Zz4=",
+    page_icon="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMiIgZmlsbD0iI2ZkZDA0MyIvPjx0ZXh0IHg9IjI1NiIgeT0iMzIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2x0IiBmb250LXNpemU9IjIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+PGZzcGFuIGZpbGw9IiMwMDAwMDAiPmJsaW5rPC9mc3Bhbj48ZnNwYW4gZmlsbD0iIzAwODEwNyI+aXQ8L2ZzcBhbj48L3RleHQ+PC9zdmc+",
     layout="wide"
 )
 
@@ -185,7 +185,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown("<p style='text-align: center;'>Upload up to 5 monthly Ad Campaign spreadsheets and up to 5 Sales Reports (.xlsx, .xls) to analyze TACOS, TROAS, Overall Sales, Spends, and multi-metric trends.</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Upload up to 5 monthly Ad Campaign spreadsheets/CSV files and up to 5 Sales Reports (.xlsx, .xls) to analyze TACOS, TROAS, Overall Sales, Spends, and multi-metric trends.</p>", unsafe_allow_html=True)
 
 def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     buffer = io.BytesIO()
@@ -451,20 +451,23 @@ st.markdown("### 📤 Upload Ad Campaign Reports (Up to 5)")
 col1, col2, col3, col4, col5 = st.columns(5)
 uploaded_files = []
 
+# Updated allowed types to accept CSV along with Excel formats (.xlsx, .xls, .xlsb, .xlsm)
+ad_file_types = ["csv", "xlsx", "xls", "xlsb", "xlsm"]
+
 with col1:
-    f1 = st.file_uploader("Upload Ad File 1", type=["xlsx", "xls", "xlsb", "xlsm"], key="file1")
+    f1 = st.file_uploader("Upload Ad File 1", type=ad_file_types, key="file1")
     if f1: uploaded_files.append(f1)
 with col2:
-    f2 = st.file_uploader("Upload Ad File 2", type=["xlsx", "xls", "xlsb", "xlsm"], key="file2")
+    f2 = st.file_uploader("Upload Ad File 2", type=ad_file_types, key="file2")
     if f2: uploaded_files.append(f2)
 with col3:
-    f3 = st.file_uploader("Upload Ad File 3", type=["xlsx", "xls", "xlsb", "xlsm"], key="file3")
+    f3 = st.file_uploader("Upload Ad File 3", type=ad_file_types, key="file3")
     if f3: uploaded_files.append(f3)
 with col4:
-    f4 = st.file_uploader("Upload Ad File 4", type=["xlsx", "xls", "xlsb", "xlsm"], key="file4")
+    f4 = st.file_uploader("Upload Ad File 4", type=ad_file_types, key="file4")
     if f4: uploaded_files.append(f4)
 with col5:
-    f5 = st.file_uploader("Upload Ad File 5", type=["xlsx", "xls", "xlsb", "xlsm"], key="file5")
+    f5 = st.file_uploader("Upload Ad File 5", type=ad_file_types, key="file5")
     if f5: uploaded_files.append(f5)
 
 st.markdown("### 📥 Upload Sales Reports (Up to 5)")
@@ -525,16 +528,15 @@ if uploaded_files:
     consolidated_raw_tabs = {}
 
     for uploaded_file in uploaded_files:
+        file_name_lower = uploaded_file.name.lower()
         fallback_month_name = os.path.splitext(uploaded_file.name)[0].upper()
         raw_files_dict[uploaded_file.name] = {}
         
         try:
-            xls = pd.ExcelFile(uploaded_file)
-            sheets_to_process = xls.sheet_names[1:] if len(xls.sheet_names) > 1 else xls.sheet_names
-            valid_sheet_names = [s for s in sheets_to_process if s.strip().lower() not in ['consolidated_master', 'summary', 'overall', 'ads dump', 'overall dump']]
-
-            for sheet_name in valid_sheet_names:
-                df = pd.read_excel(xls, sheet_name=sheet_name)
+            if file_name_lower.endswith('.csv'):
+                # Read CSV file directly into a single dataframe dictionary entry
+                df = pd.read_csv(uploaded_file)
+                sheet_name = "Sheet1"
                 raw_files_dict[uploaded_file.name][sheet_name] = df.copy()
                 
                 date_col = next((c for c in ['Date', 'date', 'Day', 'DATE', 'date_ist', 'timestamp'] if c in df.columns), None)
@@ -571,6 +573,50 @@ if uploaded_files:
                     df_consolidated.insert(2, 'Date', np.nan)
 
                 consolidated_dfs.append(df_consolidated)
+            else:
+                # Read Excel file workbook tabs
+                xls = pd.ExcelFile(uploaded_file)
+                sheets_to_process = xls.sheet_names[1:] if len(xls.sheet_names) > 1 else xls.sheet_names
+                valid_sheet_names = [s for s in sheets_to_process if s.strip().lower() not in ['consolidated_master', 'summary', 'overall', 'ads dump', 'overall dump']]
+
+                for sheet_name in valid_sheet_names:
+                    df = pd.read_excel(xls, sheet_name=sheet_name)
+                    raw_files_dict[uploaded_file.name][sheet_name] = df.copy()
+                    
+                    date_col = next((c for c in ['Date', 'date', 'Day', 'DATE', 'date_ist', 'timestamp'] if c in df.columns), None)
+
+                    if date_col:
+                        dt_series = pd.to_datetime(df[date_col], format='mixed', dayfirst=False, errors='coerce')
+                        month_series = dt_series.dt.strftime('%B').str.upper()
+                        df['Month'] = month_series.fillna(fallback_month_name)
+                        df['_date_dt'] = dt_series
+                        df['Date'] = dt_series.dt.strftime('%Y-%m-%d')
+                    else:
+                        df['Month'] = fallback_month_name
+                        df['_date_dt'] = pd.NaT
+                        df['Date'] = np.nan
+
+                    df_raw = df.copy()
+                    if sheet_name not in consolidated_raw_tabs:
+                        consolidated_raw_tabs[sheet_name] = []
+                    consolidated_raw_tabs[sheet_name].append(df_raw)
+                    
+                    df_consolidated = df.copy()
+                    if 'Month' in df_consolidated.columns:
+                        col_month = df_consolidated.pop('Month')
+                        df_consolidated.insert(0, 'Month', col_month)
+                    else:
+                        df_consolidated.insert(0, 'Month', fallback_month_name)
+                        
+                    df_consolidated.insert(1, 'Tab Name', sheet_name)
+                    
+                    if 'Date' in df_consolidated.columns:
+                        col_date = df_consolidated.pop('Date')
+                        df_consolidated.insert(2, 'Date', col_date)
+                    else:
+                        df_consolidated.insert(2, 'Date', np.nan)
+
+                    consolidated_dfs.append(df_consolidated)
         except Exception as e:
             st.error(f"Error processing {uploaded_file.name}: {str(e)}")
 
@@ -1133,7 +1179,7 @@ if uploaded_files:
         ])
 
         with main_tab1:
-            st.caption("Inspect individual sheets tab-by-tab for each uploaded file.")
+            st.caption("Inspect individual sheets/files tab-by-tab for each uploaded file.")
             selected_file_name = st.selectbox("Select Uploaded File to Preview:", list(raw_files_dict.keys()), key="raw_file_sel")
             if selected_file_name:
                 sheets = raw_files_dict[selected_file_name]
@@ -1507,13 +1553,11 @@ if uploaded_files:
         # Build ADs Dump & Overall Dump
         ads_dump_df = final_df.copy()
         
-        # Build Sequential Month Map (1, 2, 3...) based on chronological order of uploaded data
         def build_relative_month_map(dt_series_list):
             all_valid_dates = pd.concat(dt_series_list).dropna().unique()
             if len(all_valid_dates) == 0:
                 return {}
             
-            # Extract unique (year, month) pairs sorted chronologically
             dt_df = pd.DataFrame({'dt': pd.to_datetime(all_valid_dates)})
             dt_df['year_month'] = dt_df['dt'].dt.to_period('M')
             sorted_unique_ym = sorted(dt_df['year_month'].unique())
@@ -1525,7 +1569,6 @@ if uploaded_files:
                 month_map[ym] = f"{idx}. {m_short}'{y_two}"
             return month_map
 
-        # Collect dates from both ADs and Sales datasets for a unified relative month mapping
         all_dt_series = []
         if '_date_dt' in ads_dump_df.columns:
             all_dt_series.append(ads_dump_df['_date_dt'])
@@ -1634,11 +1677,9 @@ if uploaded_files:
 
         buffer_multi = io.BytesIO()
         with pd.ExcelWriter(buffer_multi, engine='openpyxl') as writer:
-            # First initial tabs: Dumps
             final_ads_dump_export.to_excel(writer, sheet_name='ADs Dump', index=False)
             final_overall_dump_export.to_excel(writer, sheet_name='Overall Dump', index=False)
 
-            # Followed by individual raw file tabs
             for raw_tab_name, df_list in consolidated_raw_tabs.items():
                 combined_raw_tab_df = pd.concat(df_list, ignore_index=True)
                 clean_sheet_name = raw_tab_name[:31]
