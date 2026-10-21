@@ -266,10 +266,10 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 val_cell.border = thin_border
 
                 if isinstance(val, (int, float, np.number)):
-                    if str(m_col).upper() in ['ACOS', 'TACOS']:
+                    if str(m_col).upper() in ['ACOS', 'TACOS', 'T-ACOS']:
                         val_cell.value = val / 100.0 if val > 1 else val
                         val_cell.number_format = '0.00%'
-                    elif str(m_col).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES']:
+                    elif str(m_col).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
                         val_cell.value = int(round(val))
                         val_cell.number_format = '#,##0'
                     else:
@@ -295,10 +295,10 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 val_cell.alignment = align_center
                 val_cell.border = thin_border
                 
-                if str(col_name).upper() in ['ACOS', 'TACOS'] and isinstance(val, (int, float, np.number)):
+                if str(col_name).upper() in ['ACOS', 'TACOS', 'T-ACOS'] and isinstance(val, (int, float, np.number)):
                     val_cell.value = val / 100.0 if val > 1 else val
                     val_cell.number_format = '0.00%'
-                elif str(col_name).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES'] and isinstance(val, (int, float, np.number)):
+                elif str(col_name).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES'] and isinstance(val, (int, float, np.number)):
                     val_cell.value = int(round(val))
                     val_cell.number_format = '#,##0'
                 elif isinstance(val, (int, float, np.number)):
@@ -397,10 +397,10 @@ def convert_all_pivots_to_excel(pivot_dict):
                         val_cell.border = thin_border
 
                         if isinstance(val, (int, float, np.number)):
-                            if str(m_col).upper() in ['ACOS', 'TACOS']:
+                            if str(m_col).upper() in ['ACOS', 'TACOS', 'T-ACOS']:
                                 val_cell.value = val / 100.0 if val > 1 else val
                                 val_cell.number_format = '0.00%'
-                            elif str(m_col).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES']:
+                            elif str(m_col).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
                                 val_cell.value = int(round(val))
                                 val_cell.number_format = '#,##0'
                             else:
@@ -426,10 +426,10 @@ def convert_all_pivots_to_excel(pivot_dict):
                         val_cell.alignment = align_center
                         val_cell.border = thin_border
                         
-                        if str(col_name).upper() in ['ACOS', 'TACOS'] and isinstance(val, (int, float, np.number)):
+                        if str(col_name).upper() in ['ACOS', 'TACOS', 'T-ACOS'] and isinstance(val, (int, float, np.number)):
                             val_cell.value = val / 100.0 if val > 1 else val
                             val_cell.number_format = '0.00%'
-                        elif str(col_name).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES'] and isinstance(val, (int, float, np.number)):
+                        elif str(col_name).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES'] and isinstance(val, (int, float, np.number)):
                             val_cell.value = int(round(val))
                             val_cell.number_format = '#,##0'
                         elif isinstance(val, (int, float, np.number)):
@@ -966,7 +966,7 @@ if uploaded_files:
                     
                     row_data['Overall Sales'] = ov_sales
                     row_data['Ad ROAS'] = ad_roas
-                    row_data['TROAS'] = troas
+                    row_data['TROas'] = troas
                     row_data['Ad Orders'] = orders
                     row_data['Overall Orders'] = ov_orders
                     row_data['TACOS'] = f"{tacos:.2f}%"
@@ -1028,6 +1028,8 @@ if uploaded_files:
                 day_sales = m_df[m_df['Day'] == day_i]
                 ov_sales = round(day_sales['_gross_amt'].sum(), 2)
                 ov_orders = len(day_sales)
+                ov_qty = int(day_sales['_qty'].sum()) if '_qty' in day_sales.columns else ov_orders
+                aov = round(ov_sales / ov_orders, 2) if ov_orders > 0 else 0.0
                 
                 day_spends = 0.0
                 day_imp = 0.0
@@ -1045,57 +1047,67 @@ if uploaded_files:
 
                 cpm = round((day_spends / day_imp) * 1000, 2) if day_imp > 0 else 0.0
                 roas = round(day_ad_sales / day_spends, 2) if day_spends > 0 else 0.0
+                acos = round((day_spends / day_ad_sales) * 100, 2) if day_ad_sales > 0 else 0.0
                 tacos = round((day_spends / ov_sales) * 100, 2) if ov_sales > 0 else 0.0
                 troas = round(ov_sales / day_spends, 2) if day_spends > 0 else 0.0
 
                 rows.append({
-                    'Date (Day)': f"Day {day_i}",
-                    'CPM': cpm,
+                    'Date': f"Day {day_i}",
+                    'Spend': day_spends,
+                    'Orders': int(day_ad_orders),
+                    'Sales': day_ad_sales,
+                    'ACOS': f"{acos:.2f}%",
+                    'ROAS': roas,
+                    'Qty Sold': ov_qty,
+                    'OV Sales': ov_sales,
+                    'T-ACOS': f"{tacos:.2f}%",
+                    'AOV': aov,
+                    # Remaining missed columns put afterwards:
                     'Impressions': int(day_imp),
-                    'Spends': day_spends,
-                    'Ad Sales': day_ad_sales,
-                    'Total Sales': ov_sales,
-                    'Ad Orders': day_ad_orders,
-                    'Total Orders': ov_orders,
+                    'CPM': cpm,
                     'ATC': int(day_atc),
-                    'TACOS': f"{tacos:.2f}%",
-                    'Ad ROAS': roas,
+                    'Total Orders': ov_orders,
                     'TROAS': troas
                 })
 
             res_df = pd.DataFrame(rows)
-            # Reordered columns: Spends, Ad Sales, Total Sales, Ad ROAS, TROAS, TACOS, Impressions, CPM, ATC, Ad Orders, Total Orders
             desired_col_order = [
-                'Date (Day)', 'Spends', 'Ad Sales', 'Total Sales', 'Ad ROAS', 'TROAS', 
-                'TACOS', 'Impressions', 'CPM', 'ATC', 'Ad Orders', 'Total Orders'
+                'Date', 'Spend', 'Orders', 'Sales', 'ACOS', 'ROAS', 'Qty Sold', 'OV Sales', 'T-ACOS', 'AOV',
+                'Impressions', 'CPM', 'ATC', 'Total Orders', 'TROAS'
             ]
             res_df = res_df[[c for c in desired_col_order if c in res_df.columns]]
 
-            total_sales_sum = res_df['Total Sales'].sum() if 'Total Sales' in res_df.columns else 0.0
-            total_orders_sum = res_df['Total Orders'].sum() if 'Total Orders' in res_df.columns else 0
-            total_spends_sum = res_df['Spends'].sum() if 'Spends' in res_df.columns else 0.0
-            total_ad_sales_sum = res_df['Ad Sales'].sum() if 'Ad Sales' in res_df.columns else 0.0
-            total_ad_orders_sum = res_df['Ad Orders'].sum() if 'Ad Orders' in res_df.columns else 0
+            total_sales_sum = res_df['Sales'].sum() if 'Sales' in res_df.columns else 0.0
+            total_orders_sum = res_df['Orders'].sum() if 'Orders' in res_df.columns else 0
+            total_spends_sum = res_df['Spend'].sum() if 'Spend' in res_df.columns else 0.0
+            total_ov_sales = res_df['OV Sales'].sum() if 'OV Sales' in res_df.columns else 0.0
+            total_qty = res_df['Qty Sold'].sum() if 'Qty Sold' in res_df.columns else 0
+            total_tot_orders = res_df['Total Orders'].sum() if 'Total Orders' in res_df.columns else 0
             total_atc_sum = res_df['ATC'].sum() if 'ATC' in res_df.columns else 0
             total_imp_sum = res_df['Impressions'].sum() if 'Impressions' in res_df.columns else 0
             avg_cpm = round(res_df['CPM'].mean(), 2) if 'CPM' in res_df.columns else 0.0
-            avg_roas = round(total_ad_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
-            avg_tacos = round((total_spends_sum / total_sales_sum) * 100, 2) if total_sales_sum > 0 else 0.0
-            avg_troas = round(total_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
+            avg_roas = round(total_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
+            avg_acos = round((total_spends_sum / total_sales_sum) * 100, 2) if total_sales_sum > 0 else 0.0
+            avg_tacos = round((total_spends_sum / total_ov_sales) * 100, 2) if total_ov_sales > 0 else 0.0
+            avg_troas = round(total_ov_sales / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
+            avg_aov = round(total_ov_sales / total_tot_orders, 2) if total_tot_orders > 0 else 0.0
 
             summary_row_dict = {
-                'Date (Day)': 'Aggregate / Average',
-                'Spends': total_spends_sum,
-                'Ad Sales': total_ad_sales_sum,
-                'Total Sales': total_sales_sum,
-                'Ad ROAS': avg_roas,
-                'TROAS': avg_troas,
-                'TACOS': f"{avg_tacos:.2f}%",
+                'Date': 'Aggregate / Average',
+                'Spend': total_spends_sum,
+                'Orders': total_orders_sum,
+                'Sales': total_sales_sum,
+                'ACOS': f"{avg_acos:.2f}%",
+                'ROAS': avg_roas,
+                'Qty Sold': total_qty,
+                'OV Sales': total_ov_sales,
+                'T-ACOS': f"{avg_tacos:.2f}%",
+                'AOV': avg_aov,
                 'Impressions': total_imp_sum,
                 'CPM': avg_cpm,
                 'ATC': int(total_atc_sum),
-                'Ad Orders': total_ad_orders_sum,
-                'Total Orders': total_orders_sum
+                'Total Orders': total_tot_orders,
+                'TROAS': avg_troas
             }
             summary_row = pd.DataFrame([{k: summary_row_dict[k] for k in res_df.columns if k in summary_row_dict}])
             res_df = pd.concat([res_df, summary_row], ignore_index=True)
@@ -1105,7 +1117,7 @@ if uploaded_files:
             if pd.isna(value):
                 return value
             col = str(column_name).strip().upper()
-            is_percentage = ('%' in col) or ('ACOS' in col) or ('TACOS' in col)
+            is_percentage = ('%' in col) or ('ACOS' in col) or ('TACOS' in col) or ('T-ACOS' in col)
 
             if isinstance(value, (int, np.integer)) and not isinstance(value, bool):
                 return f"{int(value):,}" if not is_percentage else f"{int(value)}%"
@@ -1113,8 +1125,8 @@ if uploaded_files:
             if isinstance(value, (float, np.floating)) and np.isfinite(value):
                 if is_percentage:
                     return f"{value:.2f}%"
-                if col in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES']:
-                    return f"{int(round(value)):,}"
+                if col in ['SPEND', 'SPENDS', 'SALES', 'AD SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES', 'AOV']:
+                    return f"{int(round(value)):,}" if col != 'AOV' else f"{value:,.2f}"
                 if float(value).is_integer():
                     return f"{int(value):,}"
                 return f"{value:,.2f}"
