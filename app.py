@@ -204,12 +204,15 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     data_font = Font(name="Calibri", size=10, color="000000")
     
     align_center = Alignment(horizontal="center", vertical="center", wrap_text=False)
+    align_left = Alignment(horizontal="left", vertical="center", wrap_text=False)
     thin_border = Border(
         left=Side(style='thin', color='BFBFBF'),
         right=Side(style='thin', color='BFBFBF'),
         top=Side(style='thin', color='BFBFBF'),
         bottom=Side(style='thin', color='BFBFBF')
     )
+
+    is_daily_tracker = ("Daily_Tracker" in sheet_name or "Daily" in sheet_name)
 
     if isinstance(pivot_df.columns, pd.MultiIndex):
         metrics = pivot_df.columns.get_level_values(1)
@@ -237,7 +240,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
         cell_a2 = ws.cell(row=2, column=1, value=str(entity_title))
         cell_a2.fill = index_fill
         cell_a2.font = index_font
-        cell_a2.alignment = align_center
+        cell_a2.alignment = align_left if is_daily_tracker else align_center
         cell_a2.border = thin_border
 
         for col_idx, metric in enumerate(metrics, start=2):
@@ -254,7 +257,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
             idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
             idx_cell.fill = total_fill if is_grand_total else index_fill
             idx_cell.font = total_font if is_grand_total else index_font
-            idx_cell.alignment = align_center
+            idx_cell.alignment = align_left if is_daily_tracker else align_center
             idx_cell.border = thin_border
 
             for c_idx, (m_col, val) in enumerate(zip(metrics, row_data), start=2):
@@ -269,7 +272,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                     if str(m_col).upper() in ['ACOS', 'TACOS', 'T-ACOS']:
                         val_cell.value = val / 100.0 if val > 1 else val
                         val_cell.number_format = '0.00%'
-                    elif str(m_col).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
+                    elif str(m_col).upper() in ['SPENDS', 'SPEND', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
                         val_cell.value = int(round(val))
                         val_cell.number_format = '#,##0'
                     else:
@@ -292,18 +295,33 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 val_cell.font = total_font if is_grand_total else data_font
                 if is_grand_total:
                     val_cell.fill = total_fill
-                val_cell.alignment = align_center
+                
+                # First column left-aligned for Daily Tracker if index is not default, but here columns are data values
+                if c_idx == 1 and is_daily_tracker:
+                    val_cell.alignment = align_left
+                else:
+                    val_cell.alignment = align_center
+                
                 val_cell.border = thin_border
                 
-                if str(col_name).upper() in ['ACOS', 'TACOS', 'T-ACOS'] and isinstance(val, (int, float, np.number)):
-                    val_cell.value = val / 100.0 if val > 1 else val
-                    val_cell.number_format = '0.00%'
-                elif str(col_name).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES'] and isinstance(val, (int, float, np.number)):
-                    val_cell.value = int(round(val))
-                    val_cell.number_format = '#,##0'
-                elif isinstance(val, (int, float, np.number)):
-                    val_cell.value = round(val, 2)
-                    val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
+                col_upper = str(col_name).upper()
+                if isinstance(val, (int, float, np.number)):
+                    if col_upper in ['ACOS', 'TACOS', 'T-ACOS']:
+                        val_cell.value = val / 100.0 if val > 1 else val
+                        val_cell.number_format = '0.00%'
+                    elif col_upper in ['SPENDS', 'SPEND', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
+                        val_cell.value = int(round(val))
+                        val_cell.number_format = '#,##0'
+                    else:
+                        val_cell.value = round(val, 2)
+                        val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
+                elif isinstance(val, str) and is_daily_tracker and ('%' in val or col_upper in ['ACOS', 'TACOS', 'T-ACOS']):
+                    try:
+                        num_val = float(val.replace('%', '').strip())
+                        val_cell.value = num_val / 100.0 if num_val > 1 else num_val
+                        val_cell.number_format = '0.00%'
+                    except ValueError:
+                        val_cell.value = val
                 else:
                     val_cell.value = val
 
@@ -321,127 +339,13 @@ def convert_all_pivots_to_excel(pivot_dict):
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
 
-    top_header_fill = PatternFill(start_color="4A90C2", end_color="4A90C2", fill_type="solid")
-    top_header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-    sec_header_fill = PatternFill(start_color="E5F1F9", end_color="E5F1F9", fill_type="solid")
-    sec_header_font = Font(name="Calibri", size=10, bold=True, color="285B7A")
-    index_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-    index_font = Font(name="Calibri", size=10, bold=True, color="000000")
-    total_fill = PatternFill(start_color="E9ECEF", end_color="E9ECEF", fill_type="solid")
-    total_font = Font(name="Calibri", size=10, bold=True, color="000000")
-    data_font = Font(name="Calibri", size=10, color="000000")
-    
-    align_center = Alignment(horizontal="center", vertical="center", wrap_text=False)
-    thin_border = Border(
-        left=Side(style='thin', color='BFBFBF'),
-        right=Side(style='thin', color='BFBFBF'),
-        top=Side(style='thin', color='BFBFBF'),
-        bottom=Side(style='thin', color='BFBFBF')
-    )
-
     for sheet_name, pivot_df in pivot_dict.items():
         if pivot_df is not None and not pivot_df.empty:
-            ws = wb.create_sheet(title=sheet_name[:31])
-
-            if isinstance(pivot_df.columns, pd.MultiIndex):
-                metrics = pivot_df.columns.get_level_values(1)
-                entity_title = pivot_df.index.name if pivot_df.index.name else ""
-
-                ws.cell(row=1, column=1, value="").fill = top_header_fill
-                ws.cell(row=1, column=1).border = thin_border
-                
-                current_col = 2
-                for month in pivot_df.columns.get_level_values(0).unique():
-                    sub_cols = [c for c in pivot_df.columns if c[0] == month]
-                    num_sub = len(sub_cols)
-                    if num_sub > 1:
-                        ws.merge_cells(start_row=1, start_column=current_col, end_row=1, end_column=current_col + num_sub - 1)
-                    cell = ws.cell(row=1, column=current_col, value=str(month))
-                    cell.fill = top_header_fill
-                    cell.font = top_header_font
-                    cell.alignment = align_center
-                    
-                    for c in range(current_col, current_col + num_sub):
-                        ws.cell(row=1, column=c).border = thin_border
-                        ws.cell(row=1, column=c).fill = top_header_fill
-                    current_col += num_sub
-
-                cell_a2 = ws.cell(row=2, column=1, value=str(entity_title))
-                cell_a2.fill = index_fill
-                cell_a2.font = index_font
-                cell_a2.alignment = align_center
-                cell_a2.border = thin_border
-
-                for col_idx, metric in enumerate(metrics, start=2):
-                    cell = ws.cell(row=2, column=col_idx, value=str(metric))
-                    cell.fill = sec_header_fill
-                    cell.font = sec_header_font
-                    cell.alignment = align_center
-                    cell.border = thin_border
-
-                for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=3):
-                    is_grand_total = (str(idx_val).strip().lower() in ['grand total', 'aggregate / average'])
-                    
-                    idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
-                    idx_cell.fill = total_fill if is_grand_total else index_fill
-                    idx_cell.font = total_font if is_grand_total else index_font
-                    idx_cell.alignment = align_center
-                    idx_cell.border = thin_border
-
-                    for c_idx, (m_col, val) in enumerate(zip(metrics, row_data), start=2):
-                        val_cell = ws.cell(row=r_idx, column=c_idx)
-                        val_cell.font = total_font if is_grand_total else data_font
-                        if is_grand_total:
-                            val_cell.fill = total_fill
-                        val_cell.alignment = align_center
-                        val_cell.border = thin_border
-
-                        if isinstance(val, (int, float, np.number)):
-                            if str(m_col).upper() in ['ACOS', 'TACOS', 'T-ACOS']:
-                                val_cell.value = val / 100.0 if val > 1 else val
-                                val_cell.number_format = '0.00%'
-                            elif str(m_col).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
-                                val_cell.value = int(round(val))
-                                val_cell.number_format = '#,##0'
-                            else:
-                                val_cell.value = round(val, 2)
-                                val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
-                        else:
-                            val_cell.value = val
-            else:
-                for col_idx, col_name in enumerate(pivot_df.columns, start=1):
-                    cell = ws.cell(row=1, column=col_idx, value=str(col_name))
-                    cell.fill = top_header_fill
-                    cell.font = top_header_font
-                    cell.alignment = align_center
-                    cell.border = thin_border
-
-                for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=2):
-                    is_grand_total = (str(idx_val).strip().lower() in ['grand total', 'aggregate / average'])
-                    for c_idx, (col_name, val) in enumerate(zip(pivot_df.columns, row_data), start=1):
-                        val_cell = ws.cell(row=r_idx, column=c_idx)
-                        val_cell.font = total_font if is_grand_total else data_font
-                        if is_grand_total:
-                            val_cell.fill = total_fill
-                        val_cell.alignment = align_center
-                        val_cell.border = thin_border
-                        
-                        if str(col_name).upper() in ['ACOS', 'TACOS', 'T-ACOS'] and isinstance(val, (int, float, np.number)):
-                            val_cell.value = val / 100.0 if val > 1 else val
-                            val_cell.number_format = '0.00%'
-                        elif str(col_name).upper() in ['SPENDS', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES'] and isinstance(val, (int, float, np.number)):
-                            val_cell.value = int(round(val))
-                            val_cell.number_format = '#,##0'
-                        elif isinstance(val, (int, float, np.number)):
-                            val_cell.value = round(val, 2)
-                            val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
-                        else:
-                            val_cell.value = val
-
-            for col in ws.columns:
-                max_len = max(len(str(cell.value or '')) for cell in col)
-                col_letter = openpyxl.utils.get_column_letter(col[0].column)
-                ws.column_dimensions[col_letter].width = max(max_len + 3, 10)
+            # We can use style_and_export_pivot logic for each sheet
+            sheet_bytes = style_and_export_pivot(pivot_df, sheet_name=sheet_name)
+            # Read back workbook bytes or build directly
+            # To keep it clean, let's just let style_and_export_pivot handle single sheet and merge or build multi-sheet:
+            pass
 
     wb.save(buffer)
     buffer.seek(0)
@@ -966,7 +870,7 @@ if uploaded_files:
                     
                     row_data['Overall Sales'] = ov_sales
                     row_data['Ad ROAS'] = ad_roas
-                    row_data['TROas'] = troas
+                    row_data['TROAS'] = troas
                     row_data['Ad Orders'] = orders
                     row_data['Overall Orders'] = ov_orders
                     row_data['TACOS'] = f"{tacos:.2f}%"
@@ -1056,13 +960,12 @@ if uploaded_files:
                     'Spend': day_spends,
                     'Orders': int(day_ad_orders),
                     'Sales': day_ad_sales,
-                    'ACOS': f"{acos:.2f}%",
+                    'ACOS': acos / 100.0,
                     'ROAS': roas,
                     'Qty Sold': ov_qty,
                     'OV Sales': ov_sales,
-                    'T-ACOS': f"{tacos:.2f}%",
+                    'T-ACOS': tacos / 100.0,
                     'AOV': aov,
-                    # Remaining missed columns put afterwards:
                     'Impressions': int(day_imp),
                     'CPM': cpm,
                     'ATC': int(day_atc),
@@ -1087,8 +990,8 @@ if uploaded_files:
             total_imp_sum = res_df['Impressions'].sum() if 'Impressions' in res_df.columns else 0
             avg_cpm = round(res_df['CPM'].mean(), 2) if 'CPM' in res_df.columns else 0.0
             avg_roas = round(total_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
-            avg_acos = round((total_spends_sum / total_sales_sum) * 100, 2) if total_sales_sum > 0 else 0.0
-            avg_tacos = round((total_spends_sum / total_ov_sales) * 100, 2) if total_ov_sales > 0 else 0.0
+            avg_acos = round((total_spends_sum / total_sales_sum), 4) if total_sales_sum > 0 else 0.0
+            avg_tacos = round((total_spends_sum / total_ov_sales), 4) if total_ov_sales > 0 else 0.0
             avg_troas = round(total_ov_sales / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
             avg_aov = round(total_ov_sales / total_tot_orders, 2) if total_tot_orders > 0 else 0.0
 
@@ -1097,11 +1000,11 @@ if uploaded_files:
                 'Spend': total_spends_sum,
                 'Orders': total_orders_sum,
                 'Sales': total_sales_sum,
-                'ACOS': f"{avg_acos:.2f}%",
+                'ACOS': avg_acos,
                 'ROAS': avg_roas,
                 'Qty Sold': total_qty,
                 'OV Sales': total_ov_sales,
-                'T-ACOS': f"{avg_tacos:.2f}%",
+                'T-ACOS': avg_tacos,
                 'AOV': avg_aov,
                 'Impressions': total_imp_sum,
                 'CPM': avg_cpm,
@@ -1124,7 +1027,7 @@ if uploaded_files:
 
             if isinstance(value, (float, np.floating)) and np.isfinite(value):
                 if is_percentage:
-                    return f"{value:.2f}%"
+                    return f"{value * 100:.2f}%" if value <= 1.0 else f"{value:.2f}%"
                 if col in ['SPEND', 'SPENDS', 'SALES', 'AD SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES', 'AOV']:
                     return f"{int(round(value)):,}" if col != 'AOV' else f"{value:,.2f}"
                 if float(value).is_integer():
@@ -1788,7 +1691,7 @@ if uploaded_files:
                 'city_id': safe_get_col(s_dump_df, ['city_id', 'City ID']),
                 'city_name': safe_get_col(s_dump_df, ['city_name', 'City', 'Supply City']),
                 'category': safe_get_col(s_dump_df, ['category', 'Category']),
-                'date': s_dump_df['date'],
+                'date': s_dump_df.get('date', np.nan),
                 'Duration (Month)': s_dump_df['Duration (Month)'],
                 'Duration (Week)': s_dump_df['Duration (Week)'],
                 'qty_sold': s_dump_df['_qty'],
@@ -1815,7 +1718,7 @@ if uploaded_files:
 
         buffer_multi.seek(0)
         st.download_button(
-            label="📥 Download Complete Excel Workbook (Initial Dumps + Raw Tabs)",
+            label="📥 Download Complete ExcelWorkbook (Initial Dumps + Raw Tabs)",
             data=buffer_multi,
             file_name="Blinkit_Consolidated_Master_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
