@@ -1424,7 +1424,12 @@ if uploaded_files:
                     daily_df = create_daily_tracker_table(tracker_month)
                     if not daily_df.empty:
                         render_unified_single_table(daily_df, key_prefix="daily_tracker_tab")
-                        excel_daily = style_and_export_pivot(daily_df, sheet_name="Daily_Tracker")
+                        
+                        # Filter columns up to AOV strictly for export
+                        aov_cols = ['Date', 'Spend', 'Orders', 'Sales', 'ACOS', 'ROAS', 'Qty Sold', 'OV Sales', 'T-ACOS', 'AOV']
+                        export_daily_df = daily_df[[c for c in aov_cols if c in daily_df.columns]]
+                        
+                        excel_daily = style_and_export_pivot(export_daily_df, sheet_name="Daily_Tracker")
                         st.download_button(
                             label="📥 Download Daily Tracker Table (.xlsx)",
                             data=excel_daily,
