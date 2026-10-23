@@ -229,14 +229,14 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
         cell_a2 = ws.cell(row=2, column=1, value=str(entity_title))
         cell_a2.fill = index_fill
         cell_a2.font = index_font
-        cell_a2.alignment = align_left  # First column left-aligned
+        cell_a2.alignment = align_left
         cell_a2.border = thin_border
 
         for col_idx, metric in enumerate(metrics, start=2):
             cell = ws.cell(row=2, column=col_idx, value=str(metric))
             cell.fill = sec_header_fill
             cell.font = sec_header_font
-            cell.alignment = align_center  # Other columns center-aligned
+            cell.alignment = align_center
             cell.border = thin_border
 
         start_data_row = 3
@@ -246,7 +246,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
             idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
             idx_cell.fill = total_fill if is_grand_total else index_fill
             idx_cell.font = total_font if is_grand_total else index_font
-            idx_cell.alignment = align_left  # First column left-aligned
+            idx_cell.alignment = align_left
             idx_cell.border = thin_border
 
             for c_idx, (m_col, val) in enumerate(zip(metrics, row_data), start=2):
@@ -254,7 +254,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 val_cell.font = total_font if is_grand_total else data_font
                 if is_grand_total:
                     val_cell.fill = total_fill
-                val_cell.alignment = align_center  # Other columns center-aligned
+                val_cell.alignment = align_center
                 val_cell.border = thin_border
 
                 if isinstance(val, (int, float, np.number)):
@@ -285,7 +285,6 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 if is_grand_total:
                     val_cell.fill = total_fill
                 
-                # First column left-aligned, all other columns center-aligned
                 if c_idx == 1:
                     val_cell.alignment = align_left
                 else:
@@ -1239,7 +1238,6 @@ if uploaded_files:
                 "Weekly_MoM": create_weekly_comparison_table_with_sales(final_df)
             }
             
-            # Master download button for all MoM comparison tables combined
             all_pivots_bytes = convert_all_pivots_to_excel(mom_dict)
             st.download_button(
                 label="📥 Download All MoM Comparison Tables (.xlsx - Master Workbook)",
