@@ -143,16 +143,6 @@ st.markdown("""
         box-shadow: 0 2px 9px rgba(11, 92, 173, 0.06);
     }
 
-    [data-testid="stDataFrame"] div[data-testid="stTable"] table,
-    [data-testid="stDataFrame"] table,
-    [data-testid="stDataFrame"] th,
-    [data-testid="stDataFrame"] td,
-    .stDataFrame td, .stDataFrame th {
-        text-align: center !important;
-        justify-content: center !important;
-        alignment: center !important;
-    }
-
     [data-testid="stDataFrame"] th {
         background: #E5F1F9 !important;
         color: #285B7A !important;
@@ -203,16 +193,15 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     total_font = Font(name="Calibri", size=10, bold=True, color="000000")
     data_font = Font(name="Calibri", size=10, color="000000")
     
-    align_center = Alignment(horizontal="center", vertical="center", wrap_text=False)
     align_left = Alignment(horizontal="left", vertical="center", wrap_text=False)
+    align_center = Alignment(horizontal="center", vertical="center", wrap_text=False)
+    
     thin_border = Border(
         left=Side(style='thin', color='BFBFBF'),
         right=Side(style='thin', color='BFBFBF'),
         top=Side(style='thin', color='BFBFBF'),
         bottom=Side(style='thin', color='BFBFBF')
     )
-
-    is_daily_tracker = ("Daily_Tracker" in sheet_name or "Daily" in sheet_name)
 
     if isinstance(pivot_df.columns, pd.MultiIndex):
         metrics = pivot_df.columns.get_level_values(1)
@@ -240,14 +229,14 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
         cell_a2 = ws.cell(row=2, column=1, value=str(entity_title))
         cell_a2.fill = index_fill
         cell_a2.font = index_font
-        cell_a2.alignment = align_left if is_daily_tracker else align_center
+        cell_a2.alignment = align_left  # First column left-aligned
         cell_a2.border = thin_border
 
         for col_idx, metric in enumerate(metrics, start=2):
             cell = ws.cell(row=2, column=col_idx, value=str(metric))
             cell.fill = sec_header_fill
             cell.font = sec_header_font
-            cell.alignment = align_center
+            cell.alignment = align_center  # Other columns center-aligned
             cell.border = thin_border
 
         start_data_row = 3
@@ -257,7 +246,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
             idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
             idx_cell.fill = total_fill if is_grand_total else index_fill
             idx_cell.font = total_font if is_grand_total else index_font
-            idx_cell.alignment = align_left if is_daily_tracker else align_center
+            idx_cell.alignment = align_left  # First column left-aligned
             idx_cell.border = thin_border
 
             for c_idx, (m_col, val) in enumerate(zip(metrics, row_data), start=2):
@@ -265,7 +254,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 val_cell.font = total_font if is_grand_total else data_font
                 if is_grand_total:
                     val_cell.fill = total_fill
-                val_cell.alignment = align_center
+                val_cell.alignment = align_center  # Other columns center-aligned
                 val_cell.border = thin_border
 
                 if isinstance(val, (int, float, np.number)):
@@ -296,7 +285,8 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 if is_grand_total:
                     val_cell.fill = total_fill
                 
-                if c_idx == 1 and is_daily_tracker:
+                # First column left-aligned, all other columns center-aligned
+                if c_idx == 1:
                     val_cell.alignment = align_left
                 else:
                     val_cell.alignment = align_center
@@ -314,7 +304,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                     else:
                         val_cell.value = round(val, 2)
                         val_cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
-                elif isinstance(val, str) and is_daily_tracker and ('%' in val or col_upper in ['ACOS', 'TACOS', 'T-ACOS']):
+                elif isinstance(val, str) and ('%' in val or col_upper in ['ACOS', 'TACOS', 'T-ACOS']):
                     try:
                         num_val = float(val.replace('%', '').strip())
                         val_cell.value = num_val / 100.0 if num_val > 1 else num_val
@@ -336,16 +326,14 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
 def convert_all_pivots_to_excel(pivot_dict):
     buffer = io.BytesIO()
     wb = openpyxl.Workbook()
-    wb.remove(wb.active) # Remove default sheet
+    wb.remove(wb.active)
 
     for sheet_name, pivot_df in pivot_dict.items():
         if pivot_df is not None and not pivot_df.empty:
             sheet_bytes = style_and_export_pivot(pivot_df, sheet_name=sheet_name)
-            # Load sheet_bytes into wb
             temp_wb = openpyxl.load_workbook(io.BytesIO(sheet_bytes))
             temp_ws = temp_wb.active
             temp_ws.title = sheet_name[:31]
-            # Copy sheet to wb
             wb._sheets.append(temp_ws)
 
     if not wb._sheets:
@@ -366,7 +354,6 @@ def convert_dataframe_to_excel_download(df_to_export, sheet_name="Sheet1"):
 st.markdown("### 📤 Upload Ad Campaign Reports (Up to 5)")
 col1, col2, col3, col4, col5 = st.columns(5)
 uploaded_files = []
-
 ad_file_types = ["csv", "xlsx", "xls", "xlsb", "xlsm"]
 
 with col1:
@@ -388,7 +375,6 @@ with col5:
 st.markdown("### 📥 Upload Sales Reports (Up to 5)")
 scol1, scol2, scol3, scol4, scol5 = st.columns(5)
 uploaded_sales_files = []
-
 sales_file_types = ["csv", "xlsx", "xls", "xlsb", "xlsm"]
 
 with scol1:
@@ -1089,13 +1075,13 @@ if uploaded_files:
 
             dcol1, dcol2, dcol3 = st.columns(3)
             with dcol1: st.metric("Ad Sales", f"₹{int(round(total_ad_sales)):,}")
-            with dcol2: st.metric("Total Sales", f"₹{int(round(total_overall_sales)):,}")
+            with dcol2: st.metric("Overall Sales", f"₹{int(round(total_overall_sales)):,}")
             with dcol3: st.metric("Ad ROAS", f"{overall_ad_roas:.2f}x")
 
             dcol4, dcol5, dcol6 = st.columns(3)
             with dcol4: st.metric("TACOS", f"{overall_tacos:.2f}%")
             with dcol5: st.metric("TROAS", f"{overall_troas:.2f}")
-            with dcol6: st.metric("Spends", f"₹{int(round(total_ad_spends)):,}")
+            with dcol6: st.metric("Ov Orders", f"{total_overall_orders:,}")
         else:
             dcol1, dcol2, dcol3 = st.columns(3)
             with dcol1: st.metric("Ad Sales", f"₹{int(round(total_ad_sales)):,}")
@@ -1252,9 +1238,11 @@ if uploaded_files:
                 "Keyword_MoM": create_mom_comparison_table(final_df, next((c for c in ['Search Term', 'Keyword', 'Targeting Value'] if c in final_df.columns), None)) if next((c for c in ['Search Term', 'Keyword', 'Targeting Value'] if c in final_df.columns), None) else None,
                 "Weekly_MoM": create_weekly_comparison_table_with_sales(final_df)
             }
+            
+            # Master download button for all MoM comparison tables combined
             all_pivots_bytes = convert_all_pivots_to_excel(mom_dict)
             st.download_button(
-                label="📥 Download All MoM Comparison Tables (.xlsx - One Master File with All Sub-Tabs)",
+                label="📥 Download All MoM Comparison Tables (.xlsx - Master Workbook)",
                 data=all_pivots_bytes,
                 file_name="All_MoM_Comparison_Tables_Combined.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1425,7 +1413,6 @@ if uploaded_files:
                     if not daily_df.empty:
                         render_unified_single_table(daily_df, key_prefix="daily_tracker_tab")
                         
-                        # Filter columns up to AOV strictly for export
                         aov_cols = ['Date', 'Spend', 'Orders', 'Sales', 'ACOS', 'ROAS', 'Qty Sold', 'OV Sales', 'T-ACOS', 'AOV']
                         export_daily_df = daily_df[[c for c in aov_cols if c in daily_df.columns]]
                         
@@ -1591,7 +1578,7 @@ if uploaded_files:
                 st.info("Please upload a Sales Report to view City Level Overview.")
 
         st.markdown("---")
-        st.subheader("💾 Download Consolidated Master Workbook")
+        st.subheader("💾 Download Consolidated Master Workbook & Dumps")
         
         ads_dump_df = final_df.copy()
         
@@ -1728,7 +1715,7 @@ if uploaded_files:
 
         buffer_multi.seek(0)
         st.download_button(
-            label="📥 Download Complete Excel Workbook (Initial Dumps + Raw Tabs)",
+            label="📥 Download Consolidated Master Workbook & Dumps (.xlsx)",
             data=buffer_multi,
             file_name="Blinkit_Consolidated_Master_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
