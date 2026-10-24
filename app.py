@@ -183,9 +183,9 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     ws = wb.active
     ws.title = sheet_name[:31]
     
-    header_fill_primary = PatternFill(start_color="285B7A", end_color="285B7A", fill_type="solid")  # Dark Blue
-    header_fill_secondary = PatternFill(start_color="4A90C2", end_color="4A90C2", fill_type="solid") # Standard Blue
-    header_font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")                           # White Text
+    header_fill_primary = PatternFill(start_color="285B7A", end_color="285B7A", fill_type="solid")
+    header_fill_secondary = PatternFill(start_color="4A90C2", end_color="4A90C2", fill_type="solid")
+    header_font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
     
     index_fill = PatternFill(start_color="F2F5F8", end_color="F2F5F8", fill_type="solid")
     index_font = Font(name="Calibri", size=10, bold=True, color="285B7A")
@@ -228,7 +228,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
         cell_a2 = ws.cell(row=2, column=1, value=str(entity_title))
         cell_a2.fill = header_fill_secondary
         cell_a2.font = header_font
-        cell_a2.alignment = align_center  # All columns center-aligned
+        cell_a2.alignment = align_center
         cell_a2.border = thin_border
 
         for col_idx, metric in enumerate(metrics, start=2):
@@ -245,7 +245,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
             idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
             idx_cell.fill = total_fill if is_grand_total else index_fill
             idx_cell.font = total_font if is_grand_total else index_font
-            idx_cell.alignment = align_center  # All columns center-aligned
+            idx_cell.alignment = align_center
             idx_cell.border = thin_border
 
             for c_idx, (m_col, val) in enumerate(zip(metrics, row_data), start=2):
@@ -259,7 +259,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 if isinstance(val, (int, float, np.number)):
                     col_u = str(m_col).upper()
                     if col_u in ['ACOS', 'TACOS', 'T-ACOS']:
-                        val_cell.value = val / 100.0 if val > 1 else val
+                        val_cell.value = val if val <= 1.0 else val / 100.0
                         val_cell.number_format = '0.00%'
                     elif col_u in ['SPENDS', 'SPEND', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
                         val_cell.value = int(round(val))
@@ -285,13 +285,13 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 if is_grand_total:
                     val_cell.fill = total_fill
                 
-                val_cell.alignment = align_center  # All columns center-aligned
+                val_cell.alignment = align_center
                 val_cell.border = thin_border
                 
                 col_upper = str(col_name).upper()
                 if isinstance(val, (int, float, np.number)):
                     if col_upper in ['ACOS', 'TACOS', 'T-ACOS']:
-                        val_cell.value = val / 100.0 if val > 1 else val
+                        val_cell.value = val if val <= 1.0 else val / 100.0
                         val_cell.number_format = '0.00%'
                     elif col_upper in ['SPENDS', 'SPEND', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
                         val_cell.value = int(round(val))
@@ -302,7 +302,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 elif isinstance(val, str) and ('%' in val or col_upper in ['ACOS', 'TACOS', 'T-ACOS']):
                     try:
                         num_val = float(val.replace('%', '').strip())
-                        val_cell.value = num_val / 100.0 if num_val > 1 else num_val
+                        val_cell.value = num_val / 100.0
                         val_cell.number_format = '0.00%'
                     except ValueError:
                         val_cell.value = val
@@ -937,8 +937,8 @@ if uploaded_files:
 
                 cpm = round((day_spends / day_imp) * 1000, 2) if day_imp > 0 else 0.0
                 roas = round(day_ad_sales / day_spends, 2) if day_spends > 0 else 0.0
-                acos = round((day_spends / day_ad_sales) * 100, 2) if day_ad_sales > 0 else 0.0
-                tacos = round((day_spends / ov_sales) * 100, 2) if ov_sales > 0 else 0.0
+                acos = round((day_spends / day_ad_sales), 4) if day_ad_sales > 0 else 0.0
+                tacos = round((day_spends / ov_sales), 4) if ov_sales > 0 else 0.0
                 troas = round(ov_sales / day_spends, 2) if day_spends > 0 else 0.0
 
                 rows.append({
@@ -946,11 +946,11 @@ if uploaded_files:
                     'Spend': day_spends,
                     'Orders': int(day_ad_orders),
                     'Sales': day_ad_sales,
-                    'ACOS': acos / 100.0,
+                    'ACOS': acos,
                     'ROAS': roas,
                     'Qty Sold': ov_qty,
                     'OV Sales': ov_sales,
-                    'T-ACOS': tacos / 100.0,
+                    'T-ACOS': tacos,
                     'AOV': aov,
                     'Impressions': int(day_imp),
                     'CPM': cpm,
