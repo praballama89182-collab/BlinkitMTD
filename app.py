@@ -183,31 +183,30 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     ws = wb.active
     ws.title = sheet_name[:31]
     
-    top_header_fill = PatternFill(start_color="4A90C2", end_color="4A90C2", fill_type="solid")
-    top_header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-    sec_header_fill = PatternFill(start_color="E5F1F9", end_color="E5F1F9", fill_type="solid")
-    sec_header_font = Font(name="Calibri", size=10, bold=True, color="285B7A")
-    index_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-    index_font = Font(name="Calibri", size=10, bold=True, color="000000")
-    total_fill = PatternFill(start_color="E9ECEF", end_color="E9ECEF", fill_type="solid")
+    header_fill_primary = PatternFill(start_color="285B7A", end_color="285B7A", fill_type="solid")  # Dark Blue
+    header_fill_secondary = PatternFill(start_color="4A90C2", end_color="4A90C2", fill_type="solid") # Standard Blue
+    header_font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")                           # White Text
+    
+    index_fill = PatternFill(start_color="F2F5F8", end_color="F2F5F8", fill_type="solid")
+    index_font = Font(name="Calibri", size=10, bold=True, color="285B7A")
+    total_fill = PatternFill(start_color="E1EAF2", end_color="E1EAF2", fill_type="solid")
     total_font = Font(name="Calibri", size=10, bold=True, color="000000")
     data_font = Font(name="Calibri", size=10, color="000000")
     
-    align_left = Alignment(horizontal="left", vertical="center", wrap_text=False)
     align_center = Alignment(horizontal="center", vertical="center", wrap_text=False)
     
     thin_border = Border(
-        left=Side(style='thin', color='BFBFBF'),
-        right=Side(style='thin', color='BFBFBF'),
-        top=Side(style='thin', color='BFBFBF'),
-        bottom=Side(style='thin', color='BFBFBF')
+        left=Side(style='thin', color='D3D3D3'),
+        right=Side(style='thin', color='D3D3D3'),
+        top=Side(style='thin', color='D3D3D3'),
+        bottom=Side(style='thin', color='D3D3D3')
     )
 
     if isinstance(pivot_df.columns, pd.MultiIndex):
         metrics = pivot_df.columns.get_level_values(1)
         entity_title = pivot_df.index.name if pivot_df.index.name else ""
 
-        ws.cell(row=1, column=1, value="").fill = top_header_fill
+        ws.cell(row=1, column=1, value="").fill = header_fill_primary
         ws.cell(row=1, column=1).border = thin_border
         
         current_col = 2
@@ -217,25 +216,25 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
             if num_sub > 1:
                 ws.merge_cells(start_row=1, start_column=current_col, end_row=1, end_column=current_col + num_sub - 1)
             cell = ws.cell(row=1, column=current_col, value=str(month))
-            cell.fill = top_header_fill
-            cell.font = top_header_font
+            cell.fill = header_fill_primary
+            cell.font = header_font
             cell.alignment = align_center
             
             for c in range(current_col, current_col + num_sub):
                 ws.cell(row=1, column=c).border = thin_border
-                ws.cell(row=1, column=c).fill = top_header_fill
+                ws.cell(row=1, column=c).fill = header_fill_primary
             current_col += num_sub
 
         cell_a2 = ws.cell(row=2, column=1, value=str(entity_title))
-        cell_a2.fill = index_fill
-        cell_a2.font = index_font
-        cell_a2.alignment = align_left
+        cell_a2.fill = header_fill_secondary
+        cell_a2.font = header_font
+        cell_a2.alignment = align_center  # All columns center-aligned
         cell_a2.border = thin_border
 
         for col_idx, metric in enumerate(metrics, start=2):
             cell = ws.cell(row=2, column=col_idx, value=str(metric))
-            cell.fill = sec_header_fill
-            cell.font = sec_header_font
+            cell.fill = header_fill_secondary
+            cell.font = header_font
             cell.alignment = align_center
             cell.border = thin_border
 
@@ -246,7 +245,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
             idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
             idx_cell.fill = total_fill if is_grand_total else index_fill
             idx_cell.font = total_font if is_grand_total else index_font
-            idx_cell.alignment = align_left
+            idx_cell.alignment = align_center  # All columns center-aligned
             idx_cell.border = thin_border
 
             for c_idx, (m_col, val) in enumerate(zip(metrics, row_data), start=2):
@@ -258,10 +257,11 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 val_cell.border = thin_border
 
                 if isinstance(val, (int, float, np.number)):
-                    if str(m_col).upper() in ['ACOS', 'TACOS', 'T-ACOS']:
+                    col_u = str(m_col).upper()
+                    if col_u in ['ACOS', 'TACOS', 'T-ACOS']:
                         val_cell.value = val / 100.0 if val > 1 else val
                         val_cell.number_format = '0.00%'
-                    elif str(m_col).upper() in ['SPENDS', 'SPEND', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
+                    elif col_u in ['SPENDS', 'SPEND', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
                         val_cell.value = int(round(val))
                         val_cell.number_format = '#,##0'
                     else:
@@ -272,8 +272,8 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     else:
         for col_idx, col_name in enumerate(pivot_df.columns, start=1):
             cell = ws.cell(row=1, column=col_idx, value=str(col_name))
-            cell.fill = top_header_fill
-            cell.font = top_header_font
+            cell.fill = header_fill_primary
+            cell.font = header_font
             cell.alignment = align_center
             cell.border = thin_border
 
@@ -285,11 +285,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 if is_grand_total:
                     val_cell.fill = total_fill
                 
-                if c_idx == 1:
-                    val_cell.alignment = align_left
-                else:
-                    val_cell.alignment = align_center
-                
+                val_cell.alignment = align_center  # All columns center-aligned
                 val_cell.border = thin_border
                 
                 col_upper = str(col_name).upper()
@@ -316,7 +312,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = openpyxl.utils.get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = max(max_len + 3, 10)
+        ws.column_dimensions[col_letter].width = max(max_len + 1, 10)
 
     wb.save(buffer)
     buffer.seek(0)
@@ -1701,8 +1697,13 @@ if uploaded_files:
                 'Duration (Week)', 'qty_sold', 'mrp', 'Region'
             ])
 
+        clean_master_export_df = final_df.drop(
+            columns=[c for c in final_df.columns if c.startswith('_')], errors='ignore'
+        )
+
         buffer_multi = io.BytesIO()
         with pd.ExcelWriter(buffer_multi, engine='openpyxl') as writer:
+            clean_master_export_df.to_excel(writer, sheet_name='Consolidated_Master', index=False)
             final_ads_dump_export.to_excel(writer, sheet_name='ADs Dump', index=False)
             final_overall_dump_export.to_excel(writer, sheet_name='Overall Dump', index=False)
 
