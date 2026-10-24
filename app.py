@@ -259,7 +259,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 if isinstance(val, (int, float, np.number)):
                     col_u = str(m_col).upper()
                     if col_u in ['ACOS', 'TACOS', 'T-ACOS']:
-                        val_cell.value = val if val <= 1.0 else val / 100.0
+                        val_cell.value = val / 100.0 if val > 1.0 else val
                         val_cell.number_format = '0.00%'
                     elif col_u in ['SPENDS', 'SPEND', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
                         val_cell.value = int(round(val))
@@ -291,7 +291,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 col_upper = str(col_name).upper()
                 if isinstance(val, (int, float, np.number)):
                     if col_upper in ['ACOS', 'TACOS', 'T-ACOS']:
-                        val_cell.value = val if val <= 1.0 else val / 100.0
+                        val_cell.value = val / 100.0 if val > 1.0 else val
                         val_cell.number_format = '0.00%'
                     elif col_upper in ['SPENDS', 'SPEND', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
                         val_cell.value = int(round(val))
@@ -937,8 +937,10 @@ if uploaded_files:
 
                 cpm = round((day_spends / day_imp) * 1000, 2) if day_imp > 0 else 0.0
                 roas = round(day_ad_sales / day_spends, 2) if day_spends > 0 else 0.0
-                acos = round((day_spends / day_ad_sales), 4) if day_ad_sales > 0 else 0.0
-                tacos = round((day_spends / ov_sales), 4) if ov_sales > 0 else 0.0
+                
+                # Calculate exact percentage formula: (Spends / Sales) * 100
+                acos = round((day_spends / day_ad_sales) * 100, 2) if day_ad_sales > 0 else 0.0
+                tacos = round((day_spends / ov_sales) * 100, 2) if ov_sales > 0 else 0.0
                 troas = round(ov_sales / day_spends, 2) if day_spends > 0 else 0.0
 
                 rows.append({
@@ -946,11 +948,11 @@ if uploaded_files:
                     'Spend': day_spends,
                     'Orders': int(day_ad_orders),
                     'Sales': day_ad_sales,
-                    'ACOS': acos,
+                    'ACOS': acos / 100.0,
                     'ROAS': roas,
                     'Qty Sold': ov_qty,
                     'OV Sales': ov_sales,
-                    'T-ACOS': tacos,
+                    'T-ACOS': tacos / 100.0,
                     'AOV': aov,
                     'Impressions': int(day_imp),
                     'CPM': cpm,
@@ -1013,6 +1015,7 @@ if uploaded_files:
 
             if isinstance(value, (float, np.floating)) and np.isfinite(value):
                 if is_percentage:
+                    # Clean percentage formatting for UI
                     return f"{value * 100:.2f}%" if value <= 1.0 else f"{value:.2f}%"
                 if col in ['SPEND', 'SPENDS', 'SALES', 'AD SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES', 'AOV']:
                     return f"{int(round(value)):,}" if col != 'AOV' else f"{value:,.2f}"
