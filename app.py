@@ -1309,17 +1309,6 @@ if uploaded_files:
                 "Weekly_MoM": create_weekly_comparison_table_with_sales(final_df)
             }
             
-            all_pivots_bytes = convert_all_pivots_to_excel(mom_dict)
-            st.download_button(
-                label="📥 Download All MoM Comparison Tables (.xlsx - Master Workbook)",
-                data=all_pivots_bytes,
-                file_name="All_MoM_Comparison_Tables_Combined.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="btn_dl_all_mom_pivots",
-                type="primary"
-            )
-            st.markdown("---")
-
             comp_sub_tab0, comp_sub_tab1, comp_sub_tab2, comp_sub_tab3, comp_sub_tab4, comp_sub_tab5 = st.tabs([
                 "📅 Monthly Summary",
                 "🎯 Campaign Comparison",
