@@ -996,7 +996,7 @@ if uploaded_files:
             with dcol3: st.metric("Ad ROAS", f"{overall_ad_roas:.2f}x")
             with dcol4: st.metric("TACOS", f"{overall_tacos:.2f}%")
             with dcol5: st.metric("TROAS", f"{overall_troas:.2f}")
-            with dcol6: st.metric("Ov Orders", f"{total_overall_orders:,}")
+            with dcol6: st.metric("Spends", f"₹{int(round(total_ad_spends)):,}")
         else:
             dcol1, dcol2, dcol3 = st.columns(3)
             with dcol1: st.metric("Ad Sales", f"₹{int(round(total_ad_sales)):,}")
