@@ -245,6 +245,161 @@ def convert_all_pivots_to_excel(pivot_dict):
     buffer.seek(0)
     return buffer.getvalue()
 
+
+def export_compact_mom_workbook(pivot_dict):
+    """Compact MoM workbook: one sheet per comparison table, export-only styling.
+
+    Same tables, same columns and same order as the existing MoM downloads.
+    Differences are presentation only: coloured headers, thin borders,
+    column A left-aligned (wrapped), columns B onwards centre-aligned,
+    compact column widths, and the Keyword sheet's first column at 50%
+    of its normal compact width (wrapped, so no keyword text is lost).
+    """
+    buffer = io.BytesIO()
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+
+    header_fill_primary = PatternFill(start_color="33546D", end_color="33546D", fill_type="solid")
+    header_fill_secondary = PatternFill(start_color="6B8FA3", end_color="6B8FA3", fill_type="solid")
+    header_font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+    index_fill = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
+    index_font = Font(name="Calibri", size=10, bold=True, color="33546D")
+    total_fill = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
+    total_font = Font(name="Calibri", size=10, bold=True, color="000000")
+    data_font = Font(name="Calibri", size=10, color="000000")
+    align_left = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    align_center_data = Alignment(horizontal="center", vertical="center", wrap_text=False)
+    thin_border = Border(
+        left=Side(style='thin', color='D9E2EC'),
+        right=Side(style='thin', color='D9E2EC'),
+        top=Side(style='thin', color='D9E2EC'),
+        bottom=Side(style='thin', color='D9E2EC')
+    )
+    money_cols = ['SPENDS', 'SPEND', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']
+    pct_cols = ['ACOS', 'TACOS', 'T-ACOS']
+
+    def write_value(cell, val, col_name, is_total):
+        cell.font = total_font if is_total else data_font
+        if is_total:
+            cell.fill = total_fill
+        cell.border = thin_border
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            cell.value = None
+            return
+        col_u = str(col_name).upper()
+        if isinstance(val, (int, float, np.number)):
+            if col_u in pct_cols:
+                cell.value = val / 100.0
+                cell.number_format = '0.00%'
+            elif col_u in money_cols:
+                cell.value = int(round(val))
+                cell.number_format = '#,##0'
+            else:
+                cell.value = round(val, 2)
+                cell.number_format = '#,##0.00' if not float(val).is_integer() else '#,##0'
+        elif isinstance(val, str) and ('%' in val or col_u in pct_cols):
+            try:
+                cell.value = float(val.replace('%', '').strip()) / 100.0
+                cell.number_format = '0.00%'
+            except ValueError:
+                cell.value = val
+        else:
+            cell.value = val
+
+    for sheet_name, pivot_df in pivot_dict.items():
+        if pivot_df is None or pivot_df.empty:
+            continue
+        ws = wb.create_sheet(title=sheet_name[:31])
+        ws.sheet_properties.tabColor = "33546D"
+        is_keyword = sheet_name == "Keyword_MoM" or (
+            pivot_df.index.name is not None
+            and str(pivot_df.index.name).strip().upper() in ['KEYWORD', 'SEARCH TERM', 'TARGETING VALUE']
+        )
+        is_multi = isinstance(pivot_df.columns, pd.MultiIndex)
+        if is_multi:
+            metrics = pivot_df.columns.get_level_values(1)
+            entity_title = pivot_df.index.name if pivot_df.index.name else ""
+            ws.cell(row=1, column=1, value="").fill = header_fill_primary
+            ws.cell(row=1, column=1).border = thin_border
+            current_col = 2
+            for month in pivot_df.columns.get_level_values(0).unique():
+                sub_cols = [c for c in pivot_df.columns if c[0] == month]
+                num_sub = len(sub_cols)
+                if num_sub > 1:
+                    ws.merge_cells(start_row=1, start_column=current_col, end_row=1, end_column=current_col + num_sub - 1)
+                cell = ws.cell(row=1, column=current_col, value=str(month))
+                cell.fill = header_fill_primary
+                cell.font = header_font
+                cell.alignment = align_center
+                for c in range(current_col, current_col + num_sub):
+                    ws.cell(row=1, column=c).border = thin_border
+                    ws.cell(row=1, column=c).fill = header_fill_primary
+                current_col += num_sub
+            cell_a2 = ws.cell(row=2, column=1, value=str(entity_title))
+            cell_a2.fill = header_fill_secondary
+            cell_a2.font = header_font
+            cell_a2.alignment = align_left
+            cell_a2.border = thin_border
+            for col_idx, metric in enumerate(metrics, start=2):
+                cell = ws.cell(row=2, column=col_idx, value=str(metric))
+                cell.fill = header_fill_secondary
+                cell.font = header_font
+                cell.alignment = align_center
+                cell.border = thin_border
+            for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=3):
+                is_total = str(idx_val).strip().lower() in ['grand total', 'aggregate / average']
+                idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
+                idx_cell.fill = total_fill if is_total else index_fill
+                idx_cell.font = total_font if is_total else index_font
+                idx_cell.alignment = align_left
+                idx_cell.border = thin_border
+                for c_idx, (m_col, val) in enumerate(zip(metrics, row_data), start=2):
+                    val_cell = ws.cell(row=r_idx, column=c_idx)
+                    val_cell.alignment = align_center_data
+                    write_value(val_cell, val, m_col, is_total)
+            ws.freeze_panes = "B3"
+        else:
+            for col_idx, col_name in enumerate(pivot_df.columns, start=1):
+                cell = ws.cell(row=1, column=col_idx, value=str(col_name))
+                cell.fill = header_fill_primary
+                cell.font = header_font
+                cell.alignment = align_left if col_idx == 1 else align_center
+                cell.border = thin_border
+            for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=2):
+                first_val = row_data.iloc[0] if len(row_data) > 0 else ""
+                is_total = (
+                    str(idx_val).strip().lower() in ['grand total', 'aggregate / average']
+                    or str(first_val).strip().lower().startswith('aggregate')
+                )
+                for c_idx, (col_name, val) in enumerate(zip(pivot_df.columns, row_data), start=1):
+                    val_cell = ws.cell(row=r_idx, column=c_idx)
+                    val_cell.alignment = align_left if c_idx == 1 else align_center_data
+                    write_value(val_cell, val, col_name, is_total)
+            ws.freeze_panes = "B2"
+        # Compact column widths: B onwards capped at 16, A capped at 30,
+        # Keyword A at 50% of its normal compact width (wrapped).
+        for col in ws.columns:
+            col_idx = col[0].column
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            if col_idx == 1:
+                normal = min(max(max_len + 1, 12), 30)
+                width = max(12, round(normal * 0.5, 1)) if is_keyword else normal
+            else:
+                width = min(max(max_len + 1, 10), 16)
+            ws.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.page_setup.orientation = 'landscape'
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+
+    if not wb._sheets:
+        ws = wb.create_sheet(title="Sheet1")
+        ws.cell(row=1, column=1, value="No Data")
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
+
 def convert_dataframe_to_excel_download(df_to_export, sheet_name="Sheet1"):
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
@@ -1165,12 +1320,13 @@ if uploaded_files:
             )
             st.markdown("---")
 
-            comp_sub_tab0, comp_sub_tab1, comp_sub_tab2, comp_sub_tab3, comp_sub_tab4 = st.tabs([
+            comp_sub_tab0, comp_sub_tab1, comp_sub_tab2, comp_sub_tab3, comp_sub_tab4, comp_sub_tab5 = st.tabs([
                 "📅 Monthly Summary",
                 "🎯 Campaign Comparison",
                 "📢 Ad Type Comparison",
                 "🔎 Keyword Comparison",
-                "📅 Weekly Comparison"
+                "📅 Weekly Comparison",
+                "📥 Download All MoM"
             ])
 
             with comp_sub_tab0:
@@ -1317,6 +1473,24 @@ if uploaded_files:
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="btn_dl_week_pivot"
                     )
+
+            with comp_sub_tab5:
+                st.markdown("#### 📥 Download All MoM Tables in One File")
+                st.caption("One workbook with a separate sheet for each comparison table. This is export-only styling: coloured headers, borders, columns from B onwards centre-aligned, and compact column widths. The on-screen tables and the existing per-table downloads are unchanged.")
+                st.markdown("- **Monthly Summary** — sheet: Monthly_Summary")
+                st.markdown("- **Campaign Comparison** — sheet: Campaign_MoM")
+                st.markdown("- **Ad Type Comparison** — sheet: AdType_MoM")
+                st.markdown("- **Keyword Comparison** — sheet: Keyword_MoM (keyword column at 50% width, wrapped so no keyword text is lost)")
+                st.markdown("- **Weekly Comparison** — sheet: Weekly_MoM")
+                compact_mom_bytes = export_compact_mom_workbook(mom_dict)
+                st.download_button(
+                    label="📥 Download All MoM Tables — Compact Export (.xlsx)",
+                    data=compact_mom_bytes,
+                    file_name="All_MoM_Comparison_Tables_Compact.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="btn_dl_all_mom_compact",
+                    type="primary"
+                )
 
         with main_tab4:
             st.subheader("📅 Daily Tracker")
