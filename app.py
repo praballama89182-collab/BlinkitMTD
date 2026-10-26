@@ -48,6 +48,7 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] { gap: 4px; background: var(--tab-bg); border: 1px solid var(--border); border-radius: 10px; padding: 4px; justify-content: center; }
     .stTabs [data-baseweb="tab"] { height: 36px; border-radius: 8px; color: #475569; font-weight: 600; font-size: 13px; background: var(--card); border: 1px solid var(--border-soft); text-align: center; padding: 0 12px; }
     .stTabs [aria-selected="true"] { background: var(--primary) !important; color: #FFFFFF !important; box-shadow: none; border: 0 !important; }
+    .stTabs [aria-selected="true"] *, .stTabs [aria-selected="true"] p, .stTabs [aria-selected="true"] span, .stTabs [aria-selected="true"] div { color: #FFFFFF !important; }
     [data-baseweb="select"] > div { background: var(--card) !important; border-color: var(--border) !important; border-radius: 8px !important; }
     [data-testid="stFileUploader"] { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: 0 1px 3px rgba(15,23,42,0.05); }
     [data-testid="stFileUploaderDropzone"] { background: #F8FAFC; border: 1px dashed #B6C6D3; border-radius: 8px; }
@@ -56,6 +57,10 @@ st.markdown("""
         font-weight: 600 !important; font-size: 13px !important; padding: 6px 14px !important; box-shadow: none !important;
     }
     [data-testid="stFileUploader"] button:hover, .stDownloadButton button:hover, .stButton button:hover { background: var(--ink-dark) !important; color: #FFFFFF !important; }
+    [data-testid="stFileUploader"] button *, .stDownloadButton button *, .stButton button *,
+    [data-testid="stFileUploader"] button p, .stDownloadButton button p, .stButton button p,
+    [data-testid="stFileUploader"] button span, .stDownloadButton button span, .stButton button span { color: #FFFFFF !important; }
+    button[kind="primary"], button[kind="primary"] *, button[kind="primary"] p, button[kind="primary"] span { color: #FFFFFF !important; background-color: var(--primary) !important; }
     [data-testid="stDataFrame"] { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(15,23,42,0.05); font-size: 13px; }
     [data-testid="stDataFrame"] th { background: var(--header-bg) !important; color: var(--ink-dark) !important; font-weight: 650 !important; text-align: center !important; }
     [data-testid="stRadio"] label, [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: var(--primary) !important; font-weight: 600 !important; font-size: 13px !important; }
