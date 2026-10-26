@@ -18,157 +18,58 @@ st.set_page_config(
 st.markdown("""
 <style>
     :root {
-        --dash-blue: #4A90C2;
-        --dash-blue-dark: #285B7A;
-        --dash-blue-light: #EEF6FC;
-        --dash-blue-soft: #DCECF8;
-        --dash-border: #C8DCEB;
-        --dash-text: #29465B;
-        --lavender-light: #F3EBFB;
-        --lavender-blue-mix: linear-gradient(135deg, #F3EBFB 0%, #EEF6FC 100%);
-        --lavender-border: #D5C6E8;
+        --ink: #334155;
+        --ink-dark: #243A4D;
+        --muted: #64748B;
+        --primary: #33546D;
+        --primary-soft: #5B7F95;
+        --teal: #2F5D62;
+        --surface: #F6F7F9;
+        --card: #FFFFFF;
+        --border: #D9E2EC;
+        --border-soft: #E2E8F0;
+        --header-bg: #EAF0F5;
+        --tab-bg: #EAF0F5;
     }
-
-    .stApp {
-        background: linear-gradient(180deg, #F6FAFD 0%, #FFFFFF 38%);
-        color: var(--dash-text);
-    }
-
-    [data-testid="stHeader"] {
-        background: rgba(255,255,255,0.92);
-    }
-
-    h1, h2, h3 {
-        color: var(--dash-blue-dark) !important;
-        font-weight: 700 !important;
-        text-align: center !important;
-    }
-
+    .stApp { background: var(--surface); color: var(--ink); }
+    [data-testid="stHeader"] { background: rgba(255,255,255,0.96); }
+    .block-container { padding-top: 1.2rem !important; padding-bottom: 1rem !important; max-width: 1320px; }
+    h1 { color: var(--ink-dark) !important; font-weight: 650 !important; text-align: center !important; font-size: 26px !important; margin-bottom: 4px !important; }
+    h2, h3 { color: var(--ink-dark) !important; font-weight: 650 !important; text-align: left !important; font-size: 18px !important; margin: 14px 0 6px 0 !important; }
+    h4 { color: var(--ink-dark) !important; font-weight: 600 !important; }
+    p { color: var(--ink); }
     [data-testid="stMetric"] {
-        background: linear-gradient(135deg, #FFFFFF 0%, #EEF6FF 100%);
-        border: 1px solid var(--dash-border);
-        border-left: 5px solid #6AA6CF;
-        border-radius: 14px;
-        padding: 14px 18px;
-        box-shadow: 0 3px 12px rgba(74, 144, 194, 0.10);
-        text-align: center !important;
-        align-items: center !important;
-        justify-content: center !important;
+        background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--primary-soft);
+        border-radius: 10px; padding: 10px 12px; box-shadow: 0 1px 3px rgba(15,23,42,0.06);
+        text-align: center !important; align-items: center !important; justify-content: center !important;
     }
-
-    [data-testid="stMetricLabel"] {
-        color: #52708D !important;
-        font-weight: 600 !important;
-        text-align: center !important;
-        display: flex;
-        justify-content: center;
+    [data-testid="stMetricLabel"] { color: var(--muted) !important; font-weight: 600 !important; font-size: 12px !important; text-align: center !important; display: flex; justify-content: center; }
+    [data-testid="stMetricValue"] { color: var(--ink-dark) !important; font-weight: 700 !important; font-size: 20px !important; text-align: center !important; display: flex; justify-content: center; }
+    .stTabs [data-baseweb="tab-list"] { gap: 4px; background: var(--tab-bg); border: 1px solid var(--border); border-radius: 10px; padding: 4px; justify-content: center; }
+    .stTabs [data-baseweb="tab"] { height: 36px; border-radius: 8px; color: #475569; font-weight: 600; font-size: 13px; background: var(--card); border: 1px solid var(--border-soft); text-align: center; padding: 0 12px; }
+    .stTabs [aria-selected="true"] { background: var(--primary) !important; color: #FFFFFF !important; box-shadow: none; border: 0 !important; }
+    [data-baseweb="select"] > div { background: var(--card) !important; border-color: var(--border) !important; border-radius: 8px !important; }
+    [data-testid="stFileUploader"] { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: 0 1px 3px rgba(15,23,42,0.05); }
+    [data-testid="stFileUploaderDropzone"] { background: #F8FAFC; border: 1px dashed #B6C6D3; border-radius: 8px; }
+    [data-testid="stFileUploader"] button, .stDownloadButton button, .stButton button {
+        background: var(--primary) !important; color: #FFFFFF !important; border: 0 !important; border-radius: 8px !important;
+        font-weight: 600 !important; font-size: 13px !important; padding: 6px 14px !important; box-shadow: none !important;
     }
-
-    [data-testid="stMetricValue"] {
-        color: var(--dash-blue-dark) !important;
-        font-weight: 750 !important;
-        text-align: center !important;
-        display: flex;
-        justify-content: center;
-    }
-
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-        background: var(--lavender-blue-mix);
-        border: 1px solid var(--lavender-border);
-        border-radius: 16px;
-        padding: 6px;
-        justify-content: center;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        height: 42px;
-        border-radius: 12px;
-        color: #4A3B6C;
-        font-weight: 600;
-        background: #FFFFFF;
-        border: 1px solid #E2D6F3;
-        text-align: center;
-    }
-
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #6AA6CF, #4A90C2) !important;
-        color: #FFFFFF !important;
-        box-shadow: 0 3px 9px rgba(74, 144, 194, 0.25);
-        border: 0 !important;
-    }
-
-    [data-baseweb="select"] > div {
-        background: var(--lavender-blue-mix) !important;
-        border-color: var(--lavender-border) !important;
-        border-radius: 12px !important;
-    }
-
-    [data-testid="stFileUploader"] {
-        background: #FFFFFF;
-        border: 1px solid var(--dash-border);
-        border-radius: 14px;
-        padding: 8px;
-        box-shadow: 0 2px 8px rgba(74, 144, 194, 0.07);
-    }
-
-    [data-testid="stFileUploaderDropzone"] {
-        background: #F7FBFE;
-        border: 1px dashed #9FC4DE;
-        border-radius: 10px;
-    }
-
-    [data-testid="stFileUploader"] button,
-    .stDownloadButton button,
-    .stButton button {
-        background: linear-gradient(135deg, #6AA6CF, #4A90C2) !important;
-        color: #FFFFFF !important;
-        border: 0 !important;
-        border-radius: 12px !important;
-        font-weight: 650 !important;
-        box-shadow: 0 2px 7px rgba(11, 92, 173, 0.20);
-    }
-
-    [data-testid="stFileUploader"] button:hover,
-    .stDownloadButton button:hover,
-    .stButton button:hover {
-        background: #397BAA !important;
-        color: #FFFFFF !important;
-    }
-
-    [data-testid="stDataFrame"] {
-        border: 1px solid var(--dash-border);
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 2px 9px rgba(11, 92, 173, 0.06);
-    }
-
-    [data-testid="stDataFrame"] th {
-        background: #E5F1F9 !important;
-        color: #285B7A !important;
-        font-weight: 700 !important;
-        text-align: center !important;
-    }
-
-    [data-testid="stRadio"] label,
-    [data-testid="stSelectbox"] label,
-    [data-testid="stMultiSelect"] label {
-        color: #315A7D !important;
-        font-weight: 600 !important;
-    }
-
-    hr {
-        border-color: #D7E4F2 !important;
-    }
+    [data-testid="stFileUploader"] button:hover, .stDownloadButton button:hover, .stButton button:hover { background: var(--ink-dark) !important; color: #FFFFFF !important; }
+    [data-testid="stDataFrame"] { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(15,23,42,0.05); font-size: 13px; }
+    [data-testid="stDataFrame"] th { background: var(--header-bg) !important; color: var(--ink-dark) !important; font-weight: 650 !important; text-align: center !important; }
+    [data-testid="stRadio"] label, [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label { color: var(--primary) !important; font-weight: 600 !important; font-size: 13px !important; }
+    hr { border-color: var(--border-soft) !important; margin: 12px 0 !important; }
+    [data-testid="stCaptionContainer"] { color: var(--muted) !important; }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown("""
 <div style="display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 5px;">
     <svg width="48" height="48" viewBox="0 0 512 512" style="border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-        <rect width="512" height="512" rx="112" fill="#fdd043"/>
+        <rect width="512" height="512" rx="112" fill="#F2C94C"/>
         <text x="256" y="320" font-family="Arial, sans-serif" font-weight="bold" font-size="210" text-anchor="middle">
-            <tspan fill="#000000">blink</tspan><tspan fill="#008107">it</tspan>
+            <tspan fill="#1F2937">blink</tspan><tspan fill="#2F7D4A">it</tspan>
         </text>
     </svg>
     <h1 style="margin: 0; padding: 0; line-height: 1.1;">Blinkit Ad Report & Sales Merger & Analytics</h1>
@@ -183,13 +84,13 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
     ws = wb.active
     ws.title = sheet_name[:31]
     
-    header_fill_primary = PatternFill(start_color="285B7A", end_color="285B7A", fill_type="solid")
-    header_fill_secondary = PatternFill(start_color="4A90C2", end_color="4A90C2", fill_type="solid")
+    header_fill_primary = PatternFill(start_color="33546D", end_color="33546D", fill_type="solid")
+    header_fill_secondary = PatternFill(start_color="6B8FA3", end_color="6B8FA3", fill_type="solid")
     header_font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
     
-    index_fill = PatternFill(start_color="F2F5F8", end_color="F2F5F8", fill_type="solid")
-    index_font = Font(name="Calibri", size=10, bold=True, color="285B7A")
-    total_fill = PatternFill(start_color="E1EAF2", end_color="E1EAF2", fill_type="solid")
+    index_fill = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
+    index_font = Font(name="Calibri", size=10, bold=True, color="33546D")
+    total_fill = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
     total_font = Font(name="Calibri", size=10, bold=True, color="000000")
     data_font = Font(name="Calibri", size=10, color="000000")
     
@@ -240,7 +141,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
 
         start_data_row = 3
         for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=start_data_row):
-            is_grand_total = (str(idx_val).strip().lower() in ['grand total', 'aggregate / average'])
+            is_grand_total = (str(idx_val).strip().lower() in ['grand total', 'aggregate / average'] or (len(row_data) > 0 and str(row_data.iloc[0]).strip().lower().startswith('aggregate')))
             
             idx_cell = ws.cell(row=r_idx, column=1, value=str(idx_val))
             idx_cell.fill = total_fill if is_grand_total else index_fill
@@ -259,7 +160,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 if isinstance(val, (int, float, np.number)):
                     col_u = str(m_col).upper()
                     if col_u in ['ACOS', 'TACOS', 'T-ACOS']:
-                        val_cell.value = val / 100.0 if val > 1.0 else val
+                        val_cell.value = val / 100.0
                         val_cell.number_format = '0.00%'
                     elif col_u in ['SPENDS', 'SPEND', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
                         val_cell.value = int(round(val))
@@ -278,7 +179,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
             cell.border = thin_border
 
         for r_idx, (idx_val, row_data) in enumerate(pivot_df.iterrows(), start=2):
-            is_grand_total = (str(idx_val).strip().lower() in ['grand total', 'aggregate / average'])
+            is_grand_total = (str(idx_val).strip().lower() in ['grand total', 'aggregate / average'] or (len(row_data) > 0 and str(row_data.iloc[0]).strip().lower().startswith('aggregate')))
             for c_idx, (col_name, val) in enumerate(zip(pivot_df.columns, row_data), start=1):
                 val_cell = ws.cell(row=r_idx, column=c_idx)
                 val_cell.font = total_font if is_grand_total else data_font
@@ -291,7 +192,7 @@ def style_and_export_pivot(pivot_df, sheet_name="Comparison"):
                 col_upper = str(col_name).upper()
                 if isinstance(val, (int, float, np.number)):
                     if col_upper in ['ACOS', 'TACOS', 'T-ACOS']:
-                        val_cell.value = val / 100.0 if val > 1.0 else val
+                        val_cell.value = val / 100.0
                         val_cell.number_format = '0.00%'
                     elif col_upper in ['SPENDS', 'SPEND', 'AD SALES', 'SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES']:
                         val_cell.value = int(round(val))
@@ -345,6 +246,13 @@ def convert_dataframe_to_excel_download(df_to_export, sheet_name="Sheet1"):
         df_to_export.to_excel(writer, sheet_name=sheet_name[:31], index=False)
     buffer.seek(0)
     return buffer.getvalue()
+
+def count_orders(df):
+    """Distinct orders when an Order Id column exists, else row count (fallback)."""
+    for _col in ['Order Id', 'Order ID', 'OrderId', 'order_id']:
+        if _col in df.columns:
+            return int(df[_col].nunique())
+    return int(len(df))
 
 st.markdown("### 📤 Upload Ad Campaign Reports (Up to 5)")
 col1, col2, col3, col4, col5 = st.columns(5)
@@ -614,6 +522,9 @@ if uploaded_files:
 
             all_months = get_calendar_months_asc(working_df)
             has_sales = not master_sales_df.empty and '_sales_dt' in master_sales_df.columns
+            if has_sales:
+                _sales_months = [str(x).strip().upper() for x in master_sales_df['Month'].dropna().unique()]
+                all_months = sorted(set(all_months) | set(_sales_months), key=lambda x: MONTH_ORDER_ASC.get(x, 99))
 
             rows_list = []
             for m in all_months:
@@ -639,7 +550,7 @@ if uploaded_files:
                 if has_sales:
                     m_sales_df = master_sales_df[master_sales_df['Month'] == m]
                     ov_sales = round(m_sales_df['_gross_amt'].sum(), 2)
-                    ov_orders = len(m_sales_df)
+                    ov_orders = count_orders(m_sales_df)
                     tacos = round((spends / ov_sales) * 100, 2) if ov_sales > 0 else 0.0
                     troas = round(ov_sales / spends, 2) if spends > 0 else 0.0
                     
@@ -674,7 +585,7 @@ if uploaded_files:
             for day_i in range(1, 32):
                 day_sales = m_df[m_df['Day'] == day_i]
                 ov_sales = round(day_sales['_gross_amt'].sum(), 2)
-                ov_orders = len(day_sales)
+                ov_orders = count_orders(day_sales)
                 
                 day_spends = 0.0
                 day_imp = 0.0
@@ -720,7 +631,7 @@ if uploaded_files:
             total_ad_orders_sum = res_df['Ad Orders'].sum()
             total_atc_sum = res_df['ATC'].sum()
             total_imp_sum = res_df['Impressions'].sum()
-            avg_cpm = round(res_df['CPM'].mean(), 2)
+            avg_cpm = round((total_spends_sum / total_imp_sum) * 1000, 2) if total_imp_sum > 0 else 0.0
             avg_roas = round(total_ad_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
             avg_troas = round(total_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
             avg_tacos = round((total_spends_sum / total_sales_sum) * 100, 2) if total_sales_sum > 0 else 0.0
@@ -734,6 +645,8 @@ if uploaded_files:
                 'Spends': total_spends_sum,
                 'Ad Sales': total_ad_sales_sum,
                 'Overall Sales': total_sales_sum,
+                'Ad ROAS': avg_roas,
+                'TROAS': avg_troas,
                 'Ad Orders': total_ad_orders_sum,
                 'Overall Orders': total_orders_sum,
                 'TACOS': f"{avg_tacos:.2f}%",
@@ -793,7 +706,7 @@ if uploaded_files:
                 total_orders = month_df['_orders'].sum()
                 total_spends = month_df['_budget_consumed'].sum()
                 total_sales = month_df['_sales'].sum()
-                mean_pos = month_df['_most_viewed_position'].mean()
+                mean_pos = ((month_df['_most_viewed_position'] * month_df['_impressions']).sum() / total_imp) if total_imp > 0 else month_df['_most_viewed_position'].mean()
 
                 grand_total_series[(month, 'Impressions')] = total_imp
                 grand_total_series[(month, 'CPM')] = round((total_spends / total_imp) * 1000, 2) if total_imp > 0 else 0.0
@@ -825,7 +738,7 @@ if uploaded_files:
             if working_df.empty:
                 return pd.DataFrame()
 
-            weeks_list = sorted(working_df['Dashboard_Week'].dropna().unique(), key=lambda w: int(''.join(filter(str.isdigit, str(w))) or 99))
+            weeks_list = working_df.groupby('Dashboard_Week')['_date_dt'].min().sort_values().index.tolist()
             has_sales = not master_sales_df.empty and '_sales_dt' in master_sales_df.columns
 
             rows = []
@@ -847,10 +760,13 @@ if uploaded_files:
                 }
                 
                 if has_sales:
-                    w_dates = w_df['Date'].dropna().unique()
-                    w_sales_df = master_sales_df[master_sales_df['Date_str'].isin(w_dates)]
+                    _first_dt = w_df['_date_dt'].min()
+                    _iso_year, _iso_week, _iso_day = _first_dt.isocalendar()
+                    _week_start = _first_dt - pd.Timedelta(days=_iso_day - 1)
+                    _week_end = _week_start + pd.Timedelta(days=6)
+                    w_sales_df = master_sales_df[(master_sales_df['_sales_dt'].dt.date >= _week_start.date()) & (master_sales_df['_sales_dt'].dt.date <= _week_end.date())]
                     ov_sales = round(w_sales_df['_gross_amt'].sum(), 2)
-                    ov_orders = len(w_sales_df)
+                    ov_orders = count_orders(w_sales_df)
                     tacos = round((spends / ov_sales) * 100, 2) if ov_sales > 0 else 0.0
                     troas = round(ov_sales / spends, 2) if spends > 0 else 0.0
                     
@@ -870,7 +786,7 @@ if uploaded_files:
             if not res_df.empty:
                 n_weeks = len(weeks_list)
                 tot_imp = res_df['Impressions'].sum()
-                avg_cpm = round(res_df['CPM'].mean(), 2)
+                avg_cpm = round((res_df['Spends'].sum() / tot_imp) * 1000, 2) if tot_imp > 0 else 0.0
                 tot_spends = round(res_df['Spends'].sum(), 2)
                 tot_ad_sales = round(res_df['Ad Sales'].sum(), 2)
                 avg_ad_roas = round(tot_ad_sales / tot_spends, 2) if tot_spends > 0 else 0.0
@@ -917,7 +833,7 @@ if uploaded_files:
             for day_i in range(1, 32):
                 day_sales = m_df[m_df['Day'] == day_i]
                 ov_sales = round(day_sales['_gross_amt'].sum(), 2)
-                ov_orders = len(day_sales)
+                ov_orders = count_orders(day_sales)
                 ov_qty = int(day_sales['_qty'].sum()) if '_qty' in day_sales.columns else ov_orders
                 aov = round(ov_sales / ov_orders, 2) if ov_orders > 0 else 0.0
                 
@@ -947,11 +863,11 @@ if uploaded_files:
                     'Spend': day_spends,
                     'Orders': int(day_ad_orders),
                     'Sales': day_ad_sales,
-                    'ACOS': acos / 100.0,
+                    'ACOS': acos,
                     'ROAS': roas,
                     'Qty Sold': ov_qty,
                     'OV Sales': ov_sales,
-                    'T-ACOS': tacos / 100.0,
+                    'T-ACOS': tacos,
                     'AOV': aov,
                     'Impressions': int(day_imp),
                     'CPM': cpm,
@@ -975,10 +891,10 @@ if uploaded_files:
             total_tot_orders = res_df['Total Orders'].sum() if 'Total Orders' in res_df.columns else 0
             total_atc_sum = res_df['ATC'].sum() if 'ATC' in res_df.columns else 0
             total_imp_sum = res_df['Impressions'].sum() if 'Impressions' in res_df.columns else 0
-            avg_cpm = round(res_df['CPM'].mean(), 2) if 'CPM' in res_df.columns else 0.0
+            avg_cpm = round((total_spends_sum / total_imp_sum) * 1000, 2) if total_imp_sum > 0 else 0.0
             avg_roas = round(total_sales_sum / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
-            avg_acos = round((total_spends_sum / total_sales_sum), 4) if total_sales_sum > 0 else 0.0
-            avg_tacos = round((total_spends_sum / total_ov_sales), 4) if total_ov_sales > 0 else 0.0
+            avg_acos = round((total_spends_sum / total_sales_sum) * 100, 2) if total_sales_sum > 0 else 0.0
+            avg_tacos = round((total_spends_sum / total_ov_sales) * 100, 2) if total_ov_sales > 0 else 0.0
             avg_troas = round(total_ov_sales / total_spends_sum, 2) if total_spends_sum > 0 else 0.0
             avg_aov = round(total_ov_sales / total_tot_orders, 2) if total_tot_orders > 0 else 0.0
 
@@ -1014,7 +930,7 @@ if uploaded_files:
 
             if isinstance(value, (float, np.floating)) and np.isfinite(value):
                 if is_percentage:
-                    return f"{value * 100:.2f}%" if value <= 1.0 else f"{value:.2f}%"
+                    return f"{value:.2f}%"
                 if col in ['SPEND', 'SPENDS', 'SALES', 'AD SALES', 'TOTAL SALES', 'OVERALL SALES', 'OV SALES', 'AOV']:
                     return f"{int(round(value)):,}" if col != 'AOV' else f"{value:,.2f}"
                 if float(value).is_integer():
@@ -1036,7 +952,7 @@ if uploaded_files:
                 'text-align': 'center',
                 'vertical-align': 'middle'
             }).set_table_styles([
-                {'selector': 'th', 'props': [('text-align', 'center'), ('vertical-align', 'middle'), ('background-color', '#E5F1F9'), ('color', '#285B7A')]},
+                {'selector': 'th', 'props': [('text-align', 'center'), ('vertical-align', 'middle'), ('background-color', '#EAF0F5'), ('color', '#243A4D')]},
                 {'selector': 'td', 'props': [('text-align', 'center'), ('vertical-align', 'middle')]}
             ])
             st.dataframe(
@@ -1065,16 +981,14 @@ if uploaded_files:
         if has_sales_data:
             f_sales_df = master_sales_df if selected_month == "All Months" else master_sales_df[master_sales_df['Month'] == selected_month]
             total_overall_sales = round(f_sales_df['_gross_amt'].sum(), 2)
-            total_overall_orders = len(f_sales_df)
+            total_overall_orders = count_orders(f_sales_df)
             overall_tacos = round((total_ad_spends / total_overall_sales) * 100, 2) if total_overall_sales > 0 else 0.0
             overall_troas = round(total_overall_sales / total_ad_spends, 2) if total_ad_spends > 0 else 0.0
 
-            dcol1, dcol2, dcol3 = st.columns(3)
+            dcol1, dcol2, dcol3, dcol4, dcol5, dcol6 = st.columns(6)
             with dcol1: st.metric("Ad Sales", f"₹{int(round(total_ad_sales)):,}")
             with dcol2: st.metric("Overall Sales", f"₹{int(round(total_overall_sales)):,}")
             with dcol3: st.metric("Ad ROAS", f"{overall_ad_roas:.2f}x")
-
-            dcol4, dcol5, dcol6 = st.columns(3)
             with dcol4: st.metric("TACOS", f"{overall_tacos:.2f}%")
             with dcol5: st.metric("TROAS", f"{overall_troas:.2f}")
             with dcol6: st.metric("Ov Orders", f"{total_overall_orders:,}")
@@ -1180,7 +1094,7 @@ if uploaded_files:
 
                         f_sales_amt = round(sales_filtered_raw['_gross_amt'].sum(), 2) if '_gross_amt' in sales_filtered_raw.columns else 0.0
                         f_sales_qty = int(sales_filtered_raw['_qty'].sum()) if '_qty' in sales_filtered_raw.columns else len(sales_filtered_raw)
-                        f_sales_orders = len(sales_filtered_raw)
+                        f_sales_orders = count_orders(sales_filtered_raw)
                         f_aov = round(f_sales_amt / f_sales_orders, 2) if f_sales_orders > 0 else 0.0
 
                         scol1, scol2, scol3, scol4 = st.columns(4)
@@ -1312,8 +1226,8 @@ if uploaded_files:
                 if kw_col:
                     with st.container():
                         st.markdown("""
-                        <div style="background: linear-gradient(135deg, #F3EBFB 0%, #EEF6FC 100%); border: 1px solid #D5C6E8; border-radius: 14px; padding: 16px; margin-bottom: 20px;">
-                            <h4 style="margin-top: 0; color: #285B7A; font-size: 16px; text-align: center;">Advanced Filter Parameters</h4>
+                        <div style="background: #F1F5F9; border: 1px solid #D9E2EC; border-radius: 10px; padding: 12px; margin-bottom: 14px;">
+                            <h4 style="margin-top: 0; color: #243A4D; font-size: 15px; text-align: center;">Advanced Filter Parameters</h4>
                         </div>
                         """, unsafe_allow_html=True)
                         
@@ -1433,14 +1347,16 @@ if uploaded_files:
                 city_filtered_sales = master_sales_df.copy()
                 if sel_city_month != "All Months":
                     city_filtered_sales = city_filtered_sales[city_filtered_sales['Month'] == sel_city_month]
+                month_filtered_sales = city_filtered_sales.copy()
 
+                _order_col_city = next((c for c in ['Order Id', 'Order ID', 'OrderId', 'order_id'] if c in city_filtered_sales.columns), None)
                 state_agg = city_filtered_sales.groupby('Supply State').agg(
                     Total_Sales=('_gross_amt', 'sum'),
-                    Total_Orders=('Supply State', 'count')
+                    Total_Orders=(_order_col_city, 'nunique') if _order_col_city else ('Supply State', 'count')
                 ).reset_index()
 
                 all_states_total_sales = city_filtered_sales['_gross_amt'].sum()
-                all_states_total_orders = len(city_filtered_sales)
+                all_states_total_orders = count_orders(city_filtered_sales)
 
                 state_options = [f"🌐 All States  •  Sales: ₹{int(round(all_states_total_sales)):,}  •  Orders: {all_states_total_orders:,}"]
                 state_mapping = {state_options[0]: "All States"}
@@ -1461,11 +1377,11 @@ if uploaded_files:
 
                 city_agg = city_filtered_sales.groupby('Supply City').agg(
                     Total_Sales=('_gross_amt', 'sum'),
-                    Total_Orders=('Supply City', 'count')
+                    Total_Orders=(_order_col_city, 'nunique') if _order_col_city else ('Supply City', 'count')
                 ).reset_index()
 
                 all_cities_total_sales = city_filtered_sales['_gross_amt'].sum()
-                all_cities_total_orders = len(city_filtered_sales)
+                all_cities_total_orders = count_orders(city_filtered_sales)
 
                 city_options = [f"🌐 All Cities  •  Sales: ₹{int(round(all_cities_total_sales)):,}  •  Orders: {all_cities_total_orders:,}"]
                 city_mapping = {city_options[0]: "All Cities"}
@@ -1514,9 +1430,9 @@ if uploaded_files:
                     state_contrib['Supply State'] = state_contrib['Supply State'].astype(str).str.title()
                     state_contrib['AOV'] = state_contrib.apply(lambda r: round(r['Total_Sales'] / r['Total_Orders'], 2) if r['Total_Orders'] > 0 else 0.0, axis=1)
 
-                    full_city_agg = master_sales_df.groupby('Supply City').agg(
+                    full_city_agg = month_filtered_sales.groupby('Supply City').agg(
                         Total_Sales=('_gross_amt', 'sum'),
-                        Total_Orders=('Supply City', 'count')
+                        Total_Orders=(_order_col_city, 'nunique') if _order_col_city else ('Supply City', 'count')
                     ).reset_index()
                     city_contrib = full_city_agg[full_city_agg['Total_Sales'] > 0].sort_values(by='Total_Sales', ascending=False).head(5).copy()
                     city_contrib['Supply City'] = city_contrib['Supply City'].astype(str).str.title()
@@ -1531,7 +1447,7 @@ if uploaded_files:
                                 names='Supply State',
                                 values='Total_Sales',
                                 title=f'Top 5 States Contribution (₹)',
-                                color_discrete_sequence=['#285B7A', '#4A90C2', '#6AA6CF', '#8ABCE3', '#B4D6F0']
+                                color_discrete_sequence=['#33546D', '#5B7F95', '#7FA3B8', '#A8C0D1', '#D3DEE6']
                             )
                             fig_state_pie.update_traces(
                                 textposition='inside', 
@@ -1553,7 +1469,7 @@ if uploaded_files:
                                 names='Supply City',
                                 values='Total_Sales',
                                 title=f'Top 5 Cities Contribution (₹)',
-                                color_discrete_sequence=['#0F4C81', '#1D63B8', '#3882E6', '#60A5FA', '#93C5FD']
+                                color_discrete_sequence=['#2F5D62', '#4A7A7E', '#6B9A9E', '#93B8BB', '#C2D8DA']
                             )
                             fig_city_pie.update_traces(
                                 textposition='inside', 
